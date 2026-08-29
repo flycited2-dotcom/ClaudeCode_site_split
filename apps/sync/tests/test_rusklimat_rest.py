@@ -201,3 +201,52 @@ class HeatPumpCategoryTest(SimpleTestCase):
         self.assertEqual(ids, {'uuid-1', 'uuid-2'})
         self.assertEqual(names['uuid-2'], 'Тепловые насосы воздух-воздух')
         self.assertNotIn('uuid-3', ids)
+
+
+class MasterCategoryMapTest(TestCase):
+    """Раскладка товаров Rusklimat по нашим категориям.
+
+    Регрессия 2026-08-29: в _master_category_for передавался categoryId (uuid)
+    вместо названия, поэтому не срабатывало ни одно условие и ВСЕ товары
+    Rusklimat (2823 штуки) складывались в «Бытовые сплит-системы».
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from apps.catalog.models import Category
+        # Часть категорий уже создаёт data-миграция каталога — берём или создаём
+        for breez_id, title in ((2, 'Бытовые сплит-системы'), (10, 'Мобильные кондиционеры'),
+                                (9, 'Полупромышленные сплит-системы'), (40, 'Накопительные водонагреватели'),
+                                (33, 'Конвекторы'), (25, 'Бытовые осушители воздуха')):
+            Category.objects.get_or_create(
+                breez_id=breez_id, defaults={'title': title, 'slug': f'cat-{breez_id}'},
+            )
+
+    def test_mobile_goes_to_mobile(self):
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(_master_category_for('Инверторные мобильные кондиционеры').breez_id, 10)
+
+    def test_water_heater_goes_to_water_heaters(self):
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(_master_category_for('Водонагреватели накопительные').breez_id, 40)
+
+    def test_convector_goes_to_convectors(self):
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(_master_category_for('Электрические конвекторы').breez_id, 33)
+
+    def test_dehumidifier_goes_to_dehumidifiers(self):
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(_master_category_for('Бытовые осушители воздуха').breez_id, 25)
+
+    def test_uuid_falls_back_to_split_systems(self):
+        # uuid не должен матчиться ни на что — раньше это было единственным
+        # поведением и ломало раскладку
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(_master_category_for('53d307a2-1234-5678-9abc-def012345678').breez_id, 2)
+
+    def test_retail_categories_pass_filter(self):
+        from apps.sync.rusklimat_rest import _AC_CATEGORY_RE, _AC_EXCLUDE_RE
+        for name in ('Водонагреватели накопительные', 'Электрические конвекторы',
+                     'Электрические тепловые пушки', 'Бытовые осушители воздуха'):
+            self.assertTrue(_AC_CATEGORY_RE.search(name), name)
+            self.assertFalse(_AC_EXCLUDE_RE.search(name), name)

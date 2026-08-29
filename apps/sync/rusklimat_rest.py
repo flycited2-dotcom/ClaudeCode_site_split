@@ -58,7 +58,15 @@ RUSKLIMAT_SOURCE = 'rusklimat'
 # docs/superpowers/specs/2026-08-28-heat-pumps-collection-design.md
 _AC_CATEGORY_RE = re.compile(
     r'кондицион|сплит.?систем|мульти.?сплит|мобильн\w*\s+кондицион|'
-    r'теплов\w*\s+насос',
+    r'теплов\w*\s+насос|'
+    # Розничная климатическая и тепловая техника (2026-08-29): у Rusklimat в
+    # Крыму лежат водонагреватели (44 позиции), конвекторы, пушки, осушители.
+    r'^водонагреватели|бойлеры и буферные|'
+    r'электрические конвекторы|масляны\w*\s+радиатор|'
+    r'электрические тепловые пушки|тепловентилятор|'
+    r'воздушные и тепловые завес|инфракрасные обогревател|'
+    r'осушители воздуха|увлажнители воздуха|'
+    r'компактные моноблочные приточн',
     re.IGNORECASE,
 )
 # Исключаем категории-аксессуары / запчасти / комплектующие.
@@ -214,15 +222,39 @@ def _find_ac_categories(client):
     return ids, names
 
 
+# Название категории Rusklimat → breez_id нашей мастер-категории. Порядок важен:
+# берётся первое совпадение подстроки.
+_RK_CATEGORY_MAP = (
+    ('мобильн',                 10),   # Мобильные кондиционеры
+    ('мульти',                   5),   # Мульти сплит-системы
+    ('полупромышл',              9),
+    ('канальн',                  9),
+    ('кассетн',                  9),
+    ('водонагреват',            40),   # Накопительные водонагреватели
+    ('бойлер',                  40),
+    ('конвектор',               33),
+    ('масляны',                 34),   # Масляные радиаторы
+    ('тепловые пушки',          37),
+    ('тепловентилятор',         31),
+    ('завес',                   38),   # Тепловые завесы
+    ('инфракрасные обогревател', 36),
+    ('осушител',                25),
+    ('увлажнител',              27),
+    ('приточн',                 45),   # Компактные моноблочные вентустановки
+)
+
+
 def _master_category_for(name):
-    """Маппинг Rusklimat-name в нашу master-Category."""
-    n = name.lower()
-    if 'мобильн' in n:
-        return Category.objects.filter(breez_id=10).first()
-    if 'мульти' in n or 'мульти.?сплит' in n:
-        return Category.objects.filter(breez_id=9).first()
-    if 'полупромышл' in n or 'канальн' in n or 'кассетн' in n:
-        return Category.objects.filter(title__iexact='Полупромышленные кондиционеры').first()
+    """Маппинг названия категории Rusklimat в нашу master-Category.
+
+    ВАЖНО: сюда передаётся ИМЯ категории, а не её id. До 2026-08-29 вызывающий
+    код передавал `categoryId` (uuid), из-за чего не срабатывало ни одно условие
+    и все товары Rusklimat складывались в «Бытовые сплит-системы».
+    """
+    n = (name or '').lower()
+    for needle, breez_id in _RK_CATEGORY_MAP:
+        if needle in n:
+            return Category.objects.filter(breez_id=breez_id).first()
     # default: бытовые сплит-системы
     return Category.objects.filter(breez_id=2).first()
 
@@ -420,7 +452,7 @@ def sync_rusklimat_rest(*, max_pages=None):
 
                 seen_ns.add(ns_code)
                 brand = _get_or_create_brand(brand_title, brand_cache)
-                cat = _master_category_for(p.get('categoryId', '') or '')
+                cat = _master_category_for(category_names.get(p.get('categoryId', ''), ''))
                 vendor_code = (p.get('vendorCode') or '').strip()
                 name = (p.get('name') or vendor_code or ns_code).strip()
                 description = p.get('description') or ''

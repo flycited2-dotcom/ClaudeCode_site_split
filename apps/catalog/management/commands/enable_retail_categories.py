@@ -31,6 +31,15 @@ RETAIL_CATEGORIES = {
     25:  'Бытовые осушители воздуха',
 }
 
+# Категории, которых нет в дереве Бриза, но товары под них есть у других
+# поставщиков. Создаются без breez_id — так же, как «Аксессуары для
+# кондиционеров». Ключ — title (по нему маппит синк Daichi), значение — slug.
+OWN_CATEGORIES = {
+    # У Daichi в Крыму 31 котёл: газовые настенные и электрические вперемешку,
+    # поэтому не кладём их в бризовские «Газовые котлы».
+    'Отопительные котлы': 'otopitelnye-kotly',
+}
+
 
 class Command(BaseCommand):
     help = (
@@ -74,8 +83,29 @@ class Command(BaseCommand):
                 category.sync_enabled = True
                 category.save(update_fields=['sync_enabled'])
 
+        created = 0
+        for title, slug in OWN_CATEGORIES.items():
+            category = Category.objects.filter(title=title).first()
+            if category is not None:
+                if not category.sync_enabled:
+                    self.stdout.write(self.style.SUCCESS(f'  включаю: {title}'))
+                    enabled += 1
+                    if apply_changes:
+                        category.sync_enabled = True
+                        category.save(update_fields=['sync_enabled'])
+                else:
+                    self.stdout.write(f'  уже включена: {title}')
+                continue
+            self.stdout.write(self.style.SUCCESS(f'  создаю категорию: {title}'))
+            created += 1
+            if apply_changes:
+                Category.objects.create(title=title, slug=slug, sync_enabled=True)
+
         self.stdout.write('')
-        self.stdout.write(f'Будет включено: {enabled}, пропущено: {skipped}, нет в БД: {missing}')
+        self.stdout.write(
+            f'Будет включено: {enabled}, создано: {created}, '
+            f'пропущено: {skipped}, нет в БД: {missing}'
+        )
 
         if not apply_changes:
             self.stdout.write(self.style.WARNING(
