@@ -10,6 +10,23 @@ from apps.stock.models import Stock
 
 logger = logging.getLogger(__name__)
 
+# Категории Бриза, слитые с другими (см. catalog/management/commands/merge_categories).
+# Без переадресации их товары пропали бы: родная категория выключена, а
+# _is_ac_category отсекает всё выключенное.
+_CATEGORY_REDIRECTS = {
+    120: 'Отопительные котлы',          # Двухконтурные газовые котлы
+    99:  'Инфракрасные обогреватели',   # ИК потолочные
+}
+
+
+def _redirect_category(category, breez_id):
+    """Целевая категория, если исходная была слита с другой."""
+    target_title = _CATEGORY_REDIRECTS.get(breez_id)
+    if not target_title:
+        return category
+    return Category.objects.filter(title=target_title, sync_enabled=True).first() or category
+
+
 def _is_ac_category(category, allowed_ids=None):
     """Return True if this category should be synced."""
     if category is None:
@@ -124,6 +141,8 @@ def sync_products(category_ids=None):
             cat_id = item.get('category_id')
             category = Category.objects.filter(breez_id=int(cat_id)).first() \
                 if cat_id else None
+            if cat_id:
+                category = _redirect_category(category, int(cat_id))
 
             if not _is_ac_category(category, allowed_ids):
                 skipped += 1

@@ -7,6 +7,7 @@ from django.db.models.functions import Coalesce
 from django.http import Http404
 from .models import Product, Category, Brand
 from .collections import COLLECTIONS, get_collection
+from .navigation import group_categories
 from .filters import ProductFilter
 from .facets import compute_facets
 from .dynamic_filters import apply_tech_filters, compute_tech_facets
@@ -146,10 +147,22 @@ def catalog(request):
     categories = (
         Category.objects
         .filter(sync_enabled=True)
-        .annotate(product_count=Count('products', filter=Q(products__is_active=True)))
-        .filter(product_count__gt=0)
+        .annotate(
+            # Показываем количество В НАЛИЧИИ: каталог по умолчанию фильтрует
+            # крымский склад, и счётчик «всего» вводил в заблуждение —
+            # раздел с 453 товарами открывался с одной позицией.
+            product_count=Count('products', filter=Q(
+                products__is_active=True,
+                products__kind=Product.KIND_SPLIT_SYSTEM,
+                products__stock__warehouse='Симферополь',
+                products__stock__quantity__gt=0,
+            ), distinct=True),
+            total_count=Count('products', filter=Q(products__is_active=True), distinct=True),
+        )
+        .filter(total_count__gt=0)
         .order_by('order', 'title')
     )
+    category_groups = group_categories(categories)
 
     facets = compute_facets(request.GET, base_qs, scope='catalog')
     selected_category = f.form.cleaned_data.get('category') if f.form.is_valid() else None
@@ -159,6 +172,7 @@ def catalog(request):
         'filter': f,
         'page_obj': page,
         'categories': categories,
+        'category_groups': category_groups,
         'collections': list(COLLECTIONS.values()),
         'show_price': request.user.is_authenticated and request.user.is_approved,
         'current_ordering': ordering_key,
@@ -212,15 +226,28 @@ def collection(request, slug):
     categories = (
         Category.objects
         .filter(sync_enabled=True)
-        .annotate(product_count=Count('products', filter=Q(products__is_active=True)))
-        .filter(product_count__gt=0)
+        .annotate(
+            # Показываем количество В НАЛИЧИИ: каталог по умолчанию фильтрует
+            # крымский склад, и счётчик «всего» вводил в заблуждение —
+            # раздел с 453 товарами открывался с одной позицией.
+            product_count=Count('products', filter=Q(
+                products__is_active=True,
+                products__kind=Product.KIND_SPLIT_SYSTEM,
+                products__stock__warehouse='Симферополь',
+                products__stock__quantity__gt=0,
+            ), distinct=True),
+            total_count=Count('products', filter=Q(products__is_active=True), distinct=True),
+        )
+        .filter(total_count__gt=0)
         .order_by('order', 'title')
     )
+    category_groups = group_categories(categories)
 
     context = {
         'filter': f,
         'page_obj': page,
         'categories': categories,
+        'category_groups': category_groups,
         'collections': list(COLLECTIONS.values()),
         'collection': coll,
         'show_price': request.user.is_authenticated and request.user.is_approved,

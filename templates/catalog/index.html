@@ -23,53 +23,6 @@
   <aside id="catalog-sidebar"
          class="hidden lg:block w-full lg:w-64 shrink-0 space-y-4">
 
-    <!-- Категории — кнопки с подкатегориями. -->
-    <div class="card p-5">
-      <h2 class="font-bold text-base mb-3 text-gray-800">Каталог</h2>
-      <div class="space-y-3">
-        {% for cat in categories %}
-          {% with cat_id_str=cat.pk|stringformat:'s' %}
-          <div>
-            <a href="?category={{ cat.pk }}"
-               class="cat-btn {% if request.GET.category == cat_id_str and not request.GET.inverter and not request.GET.type %}is-active{% endif %}">
-              <span>{{ cat.title }}</span>
-              <span class="cat-btn-count">{{ cat.product_count }}</span>
-            </a>
-
-            {# Подкатегории — для бытовых: инвертор/он-офф, для полупром: тип блока. #}
-            {% if cat.pk == 2 %}
-              <div class="mt-1.5 flex flex-col">
-                <a href="?category={{ cat.pk }}&inverter=inverter"
-                   class="subcat-link {% if request.GET.category == cat_id_str and request.GET.inverter == 'inverter' %}is-active{% endif %}">
-                  Инверторные
-                </a>
-                <a href="?category={{ cat.pk }}&inverter=onoff"
-                   class="subcat-link {% if request.GET.category == cat_id_str and request.GET.inverter == 'onoff' %}is-active{% endif %}">
-                  Классические (on-off)
-                </a>
-              </div>
-            {% elif cat.pk == 6 %}
-              <div class="mt-1.5 flex flex-col">
-                <a href="?category={{ cat.pk }}&type=cassette"
-                   class="subcat-link {% if request.GET.category == cat_id_str and request.GET.type == 'cassette' %}is-active{% endif %}">
-                  Кассетные
-                </a>
-                <a href="?category={{ cat.pk }}&type=duct"
-                   class="subcat-link {% if request.GET.category == cat_id_str and request.GET.type == 'duct' %}is-active{% endif %}">
-                  Канальные
-                </a>
-                <a href="?category={{ cat.pk }}&type=floor_ceiling"
-                   class="subcat-link {% if request.GET.category == cat_id_str and request.GET.type == 'floor_ceiling' %}is-active{% endif %}">
-                  Напольно-потолочные
-                </a>
-              </div>
-            {% endif %}
-          </div>
-          {% endwith %}
-        {% endfor %}
-      </div>
-    </div>
-
     {% comment %}
     Подборки — срезы каталога, а не категории: товар остаётся в своей
     категории и одновременно виден здесь (apps/catalog/collections.py).
@@ -87,6 +40,62 @@
       </div>
     </div>
     {% endif %}
+
+    <!-- Категории по смысловым группам (порядок — apps/catalog/navigation.py) -->
+    <div class="card p-5">
+      <h2 class="font-bold text-base mb-3 text-gray-800">Каталог</h2>
+      {% for group_title, group_cats in category_groups %}
+        <div class="{% if not forloop.first %}mt-4 pt-4 border-t border-black/5{% endif %}">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-ink-3 mb-2">{{ group_title }}</p>
+          <div class="space-y-3">
+            {% for cat in group_cats %}
+              {% with cat_id_str=cat.pk|stringformat:'s' %}
+              <div>
+                <a href="?category={{ cat.pk }}{% if not cat.product_count %}&with_order=1{% endif %}"
+                   class="cat-btn {% if request.GET.category == cat_id_str and not request.GET.inverter and not request.GET.type %}is-active{% endif %}">
+                  <span>{{ cat.title }}</span>
+                  {% if cat.product_count %}
+                    <span class="cat-btn-count">{{ cat.product_count }}</span>
+                  {% else %}
+                    <span class="cat-btn-count" title="Сейчас нет на крымском складе — привезём под заказ">под заказ</span>
+                  {% endif %}
+                </a>
+
+                {# Подкатегории — для бытовых: инвертор/он-офф, для полупром: тип блока. #}
+                {% if cat.pk == 2 %}
+                  <div class="mt-1.5 flex flex-col">
+                    <a href="?category={{ cat.pk }}&inverter=inverter"
+                       class="subcat-link {% if request.GET.category == cat_id_str and request.GET.inverter == 'inverter' %}is-active{% endif %}">
+                      Инверторные
+                    </a>
+                    <a href="?category={{ cat.pk }}&inverter=onoff"
+                       class="subcat-link {% if request.GET.category == cat_id_str and request.GET.inverter == 'onoff' %}is-active{% endif %}">
+                      Классические (on-off)
+                    </a>
+                  </div>
+                {% elif cat.pk == 6 %}
+                  <div class="mt-1.5 flex flex-col">
+                    <a href="?category={{ cat.pk }}&type=cassette"
+                       class="subcat-link {% if request.GET.category == cat_id_str and request.GET.type == 'cassette' %}is-active{% endif %}">
+                      Кассетные
+                    </a>
+                    <a href="?category={{ cat.pk }}&type=duct"
+                       class="subcat-link {% if request.GET.category == cat_id_str and request.GET.type == 'duct' %}is-active{% endif %}">
+                      Канальные
+                    </a>
+                    <a href="?category={{ cat.pk }}&type=floor_ceiling"
+                       class="subcat-link {% if request.GET.category == cat_id_str and request.GET.type == 'floor_ceiling' %}is-active{% endif %}">
+                      Напольно-потолочные
+                    </a>
+                  </div>
+                {% endif %}
+              </div>
+              {% endwith %}
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
 
     {% include 'catalog/partials/_filters.html' %}
 
