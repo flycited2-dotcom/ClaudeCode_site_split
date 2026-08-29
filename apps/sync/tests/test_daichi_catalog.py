@@ -6,9 +6,12 @@
 """
 from decimal import Decimal
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
-from apps.sync.daichi_catalog import _fetch_all_productparams, _prefetch_kit_wholesales
+from apps.catalog.models import Category
+from apps.sync.daichi_catalog import (
+    _fetch_all_productparams, _prefetch_kit_wholesales, _resolve_category,
+)
 
 
 class FakeClient:
@@ -110,3 +113,73 @@ class PrefetchKitWholesalesTest(SimpleTestCase):
         error_logs = [r for r in cm.records if r.levelname == 'ERROR']
         self.assertEqual(len(error_logs), 1)
         self.assertIn('kit-xml-2', error_logs[0].getMessage())
+
+
+class ResolveCategoryTest(TestCase):
+    """Раскладка розницы Daichi по разделам (2026-08-30).
+
+    Группа «Обогреватели» у поставщика смешанная — конвекторы, масляные,
+    ИК и тепловентиляторы лежат вместе, поэтому раскладываем по
+    ATTR_RUS_NAME_AX. Остальные группы едут в раздел целиком.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        for title in (
+            'Конвекторы', 'Масляные радиаторы', 'Инфракрасные обогреватели',
+            'Тепловентиляторы', 'Бытовые вентиляторы', 'Воздухоочистители',
+            'Оконные кондиционеры',
+        ):
+            Category.objects.create(
+                title=title, slug=f'cat-{len(title)}-{title[:6]}', sync_enabled=True,
+            )
+        Category.objects.create(title='Выключенный', slug='off-cat', sync_enabled=False)
+
+    def _resolve(self, group, rus_name=''):
+        cat = _resolve_category({
+            'ATTR_L_GOODGROUP': group, 'ATTR_RUS_NAME_AX': rus_name,
+        })
+        return cat.title if cat else None
+
+    def test_heater_convector(self):
+        self.assertEqual(
+            self._resolve('Обогреватели', 'Конвектор электрический'), 'Конвекторы')
+
+    def test_heater_oil(self):
+        self.assertEqual(
+            self._resolve('Обогреватели', 'Радиатор масляный'), 'Масляные радиаторы')
+
+    def test_heater_infrared(self):
+        self.assertEqual(
+            self._resolve('Обогреватели', 'Обогреватель инфракрасный'),
+            'Инфракрасные обогреватели')
+
+    def test_heater_fan(self):
+        self.assertEqual(
+            self._resolve('Обогреватели', 'Тепловентилятор керамический'),
+            'Тепловентиляторы')
+
+    def test_heater_unknown_type_skipped(self):
+        """Неизвестный тип внутри «Обогревателей» не сваливаем в случайный раздел."""
+        self.assertIsNone(self._resolve('Обогреватели', 'Обогреватель галогеновый'))
+
+    def test_fans_go_whole_group(self):
+        self.assertEqual(
+            self._resolve('Бытовые вентиляторы', 'Вентилятор напольный'),
+            'Бытовые вентиляторы')
+
+    def test_air_purifiers(self):
+        self.assertEqual(
+            self._resolve('Воздухоочистители', 'Воздухоочиститель'), 'Воздухоочистители')
+
+    def test_window_acs(self):
+        self.assertEqual(
+            self._resolve('Оконные кондиционеры', 'Оконный кондиционер'),
+            'Оконные кондиционеры')
+
+    def test_unknown_group_skipped(self):
+        self.assertIsNone(self._resolve('Чиллеры', 'Чиллер'))
+
+    def test_disabled_category_skipped(self):
+        Category.objects.filter(title='Воздухоочистители').update(sync_enabled=False)
+        self.assertIsNone(self._resolve('Воздухоочистители', 'Воздухоочиститель'))
