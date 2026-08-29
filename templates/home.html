@@ -47,27 +47,51 @@
 <!-- HERO bento grid -->
 <section class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-8" style="grid-auto-rows: minmax(140px, auto);">
 
-  <!-- Big hero tile -->
-  <div class="md:col-span-8 md:row-span-3 relative overflow-hidden rounded-[28px] p-8 md:p-11 text-white flex flex-col min-h-[460px]"
-       style="background: linear-gradient(135deg, #0e1a2b 0%, #14304d 80%);">
-    <div class="swirl-bg" style="top: -200px; right: -150px; opacity: 0.6;"></div>
-    <div class="relative z-10 flex flex-col gap-4 h-full">
-      <span class="chip self-start" style="background: rgba(255,255,255,0.1); color: #9adcff; border: 1px solid rgba(154,220,255,0.3);">
-        <span class="dot dot-blue"></span> сезон 2026 · скидки до 30%
+  {% comment %}
+  Сезонный герой-блок. Конец августа — продаём не холод, а тепло: инвертор с
+  обогревом до -20 °C закрывает отопление в межсезонье. Фон — фотография
+  (webp с jpeg-фолбэком, 109 КБ), поверх градиент слева, чтобы текст читался
+  на любой картинке. При смене сезона меняются картинка и три строки текста.
+  {% endcomment %}
+  <div class="md:col-span-8 md:row-span-3 relative overflow-hidden rounded-[28px] text-white flex flex-col min-h-[460px]">
+    <picture>
+      <source type="image/webp"
+              srcset="{% static 'img/hero/autumn-heat-sm.webp' %} 900w, {% static 'img/hero/autumn-heat.webp' %} 1600w"
+              sizes="(max-width: 768px) 100vw, 66vw">
+      <img src="{% static 'img/hero/autumn-heat.jpg' %}"
+           srcset="{% static 'img/hero/autumn-heat-sm.jpg' %} 900w, {% static 'img/hero/autumn-heat.jpg' %} 1600w"
+           sizes="(max-width: 768px) 100vw, 66vw"
+           alt="Тёплая комната осенним вечером: кондиционер работает на обогрев, за окном дождь"
+           class="absolute inset-0 h-full w-full object-cover" fetchpriority="high" decoding="async">
+    </picture>
+    {# Подложка: слева плотная, справа прозрачная — фото остаётся видно #}
+    <div class="absolute inset-0 bg-gradient-to-r from-ink via-ink/85 to-ink/25"></div>
+    <div class="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent md:hidden"></div>
+
+    <div class="relative z-10 flex flex-col gap-3 h-full p-6 sm:p-8 md:p-11">
+      <span class="chip self-start" style="background: rgba(255,255,255,0.12); color: #ffd7a3; border: 1px solid rgba(255,215,163,0.35);">
+        <span class="dot" style="background:#ffb05c;"></span> Тёплая осень начинается дома
       </span>
-      <h1 class="mt-auto text-white" style="font-size: clamp(48px, 8vw, 104px); font-weight: 700; letter-spacing: -0.04em; line-height: 0.92;">
-        Тихо.<br>
-        <span style="color: #7adfd6;">Прохладно.</span><br>
-        Просто.
+      <h1 class="mt-auto text-white" style="font-size: clamp(34px, 6.4vw, 76px); font-weight: 700; letter-spacing: -0.035em; line-height: 1;">
+        Обогревайте дом<br>
+        <span style="background: linear-gradient(90deg,#ffd18a,#ff9d54); -webkit-background-clip: text; background-clip: text; color: transparent;">тепловым насосом</span>
       </h1>
-      <p class="text-[17px] leading-relaxed max-w-md" style="color: #a3b8d1;">
-        Подбираем кондиционеры под вашу комнату, привозим и устанавливаем за один день. По всему Крыму.
+      <p class="text-[15px] sm:text-[17px] leading-relaxed max-w-md" style="color: #cbd8e8;">
+        Инверторная сплит-система греет до −20 °C и отдаёт 3–4 кВт тепла на каждый киловатт
+        электричества — в разы дешевле обогревателя. Привезём и установим за день.
       </p>
-      <div class="flex gap-3 items-center flex-wrap">
-        <a href="/quiz/" class="btn btn-primary">AI-подбор</a>
-        <a href="/catalog/" class="btn" style="background: rgba(255,255,255,0.08); color: #fff; border: 1px solid rgba(255,255,255,0.15);">
-          Каталог &rarr;
+      <div class="flex gap-2 sm:gap-3 items-center flex-wrap">
+        <a href="/catalog/heat-pumps/" class="btn btn-primary">Тепловые насосы</a>
+        <a href="/quiz/" class="btn" style="background: rgba(255,255,255,0.10); color: #fff; border: 1px solid rgba(255,255,255,0.20);">
+          Подобрать за минуту
         </a>
+      </div>
+      <div class="flex flex-wrap gap-x-4 gap-y-1 text-[13px] sm:text-sm" style="color: #a8bcd4;">
+        <span>Греет до −20 °C</span>
+        <span class="hidden sm:inline">·</span>
+        <span>В 3–4 раза дешевле электрокотла</span>
+        <span class="hidden sm:inline">·</span>
+        <span>Установка за 1 день</span>
       </div>
     </div>
   </div>
