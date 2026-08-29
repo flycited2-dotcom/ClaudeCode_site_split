@@ -1,5 +1,13 @@
+import sys
 from pathlib import Path
+
 from decouple import config, Csv
+
+# Идёт ли прогон тестов. Нужен, чтобы тестовые данные не уезжали наружу:
+# 2026-08-29 тесты регистрации отправили десяток «новых регистраций»
+# (ivan@example.com, ООО Тест) в рабочий Telegram-канал владельца — задача
+# ушла в общий с продом Redis, и её выполнил боевой воркер.
+TESTING = 'test' in sys.argv
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 

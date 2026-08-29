@@ -31,9 +31,14 @@ class ManagerNotificationTaskTest(SimpleTestCase):
         telegram.assert_called_once()
         email.assert_called_once()
 
+    @override_settings(TESTING=False)
     @patch('apps.notifications.tasks.send_manager_notifications.apply_async',
            side_effect=ConnectionError)
     def test_broker_failure_does_not_escape_request_helper(self, apply_async):
+        # TESTING=False снимаем намеренно: при обычном прогоне уведомления
+        # вообще не ставятся в очередь (защита от утечки тестовых данных в
+        # рабочий Telegram, см. apps/notifications/tasks), а здесь нужно
+        # проверить именно устойчивость к падению брокера.
         self.assertFalse(enqueue_manager_notifications(telegram_text='Message'))
         apply_async.assert_called_once()
 

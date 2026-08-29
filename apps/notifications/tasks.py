@@ -30,6 +30,13 @@ def send_manager_notifications(*, subject='', email_body='', telegram_text=''):
 
 def enqueue_manager_notifications(*, subject='', email_body='', telegram_text=''):
     """Best-effort enqueue: a broker outage must not reject a saved order/lead."""
+    # Во время тестов наружу не пишем. Тестовый прогон может делить брокер с
+    # продом (так и случилось 2026-08-29: боевой воркер разослал менеджеру
+    # выдуманные регистрации из тестов), поэтому глушим на входе, а не надеемся
+    # на то, что у тестового окружения нет токена.
+    if getattr(settings, 'TESTING', False):
+        logger.debug('TESTING=True — уведомление менеджеру не ставится в очередь')
+        return False
     try:
         send_manager_notifications.apply_async(
             kwargs={
