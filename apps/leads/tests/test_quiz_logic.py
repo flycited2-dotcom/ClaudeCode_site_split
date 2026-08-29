@@ -39,11 +39,13 @@ class BtuCandidatesTest(SimpleTestCase):
         self.assertEqual(sec, [12])
 
     def test_22_near_20_border(self):
-        # 22 в окне границы 20 (lower=7, upper=9). main=9 (т.к. area > 20 и ≤ 25).
-        # candidate = lower = 7 → secondary.
+        # 22 м² попадает в окно ±3 сразу у ДВУХ границ: 20 (lower=7, upper=9)
+        # и 25 (lower=9, upper=12). main=9, и в secondary идут оба соседа —
+        # «впритык» 7 и «с запасом» 12. Тест раньше ждал только [7], потому что
+        # писался до расширения окна до 3 м².
         main, sec = quiz_logic.btu_candidates(22)
         self.assertEqual(main, 9)
-        self.assertEqual(sec, [7])
+        self.assertEqual(sec, [7, 12])
 
     def test_28_near_25_border(self):
         # 28 в окне границы 25. main=12. candidate=9 (lower) → secondary.
@@ -235,20 +237,24 @@ class RecommendProductsTest(_RecommendBase):
         self.assertIn('nothing_found', relaxed)
 
     def test_commercial_excludes_mobile(self):
-        self._make(nc_code='NC-10', title='AC Mobile 9', btu_calc=9)
-        self._make(nc_code='NC-11', title='AC Standard 9', btu_calc=9)
+        # Отсев идёт по русскому «мобильн» (_MOBILE_Q) — так товары и называются
+        # у поставщиков: в каталоге 122 позиции с «мобильн» и ни одной с латинским
+        # Mobile (проверено на проде 2026-08-29). Тест раньше давал латиницу и
+        # падал, хотя на живых данных фильтр работает.
+        self._make(nc_code='NC-10', title='Мобильный кондиционер 9', btu_calc=9)
+        self._make(nc_code='NC-11', title='Сплит-система Стандарт 9', btu_calc=9)
         products, relaxed = quiz_logic.recommend_products(
             9, budget_max=None, room_type='commercial',
         )
         titles = [p.title for p in products]
-        self.assertNotIn('AC Mobile 9', titles)
-        self.assertIn('AC Standard 9', titles)
+        self.assertNotIn('Мобильный кондиционер 9', titles)
+        self.assertIn('Сплит-система Стандарт 9', titles)
 
     def test_room_type_none_keeps_mobile(self):
-        self._make(nc_code='NC-20', title='AC Mobile 9', btu_calc=9)
+        self._make(nc_code='NC-20', title='Мобильный кондиционер 9', btu_calc=9)
         products, relaxed = quiz_logic.recommend_products(9, room_type=None)
         titles = [p.title for p in products]
-        self.assertIn('AC Mobile 9', titles)
+        self.assertIn('Мобильный кондиционер 9', titles)
 
     def test_multi_split_excluded(self):
         # Внутренние блоки мульти-сплита засоряют каталог — должны выпасть.
@@ -293,16 +299,31 @@ class WifiFilterTest(_RecommendBase):
         self.assertEqual(relaxed, [])
 
     def test_wifi_filter_excludes_explicit_no(self):
-        # Если в TechSpec написано «Нет» — товар НЕ должен попасть.
+        """Характеристика «Wi-Fi: Нет» убирает товар из выдачи.
+
+        Тест переписан 2026-08-29. Прежняя версия требовала одновременно, чтобы
+        товар был отсеян И чтобы сработала релаксация wifi — но релаксация как
+        раз снимает требование Wi-Fi и возвращает этот же товар, когда других
+        нет. Условия противоречили друг другу, тест падал при любой реализации.
+        Проверяем то, ради чего фильтр написан: при наличии альтернативы модель
+        с явным «Нет» в выдачу не попадает и ослаблять ничего не нужно.
+
+        Названия — без подстроки wi-fi: WIFI_Q ищет упоминание и в title, так
+        что «no-wifi» в названии сам по себе читался как признак наличия.
+        """
         spec = TechSpec.objects.create(title='Wi-Fi')
-        no_wifi = self._make(nc_code='NC-WN', title='AC Standard 9 no-wifi', btu_calc=9)
+
+        no_wifi = self._make(nc_code='NC-WN', title='Сплит-система Стандарт 9', btu_calc=9)
         ProductTech.objects.create(product=no_wifi, spec=spec, value='Нет')
+
+        with_wifi = self._make(nc_code='NC-WY', title='Сплит-система Комфорт 9', btu_calc=9)
+        ProductTech.objects.create(product=with_wifi, spec=spec, value='Да')
 
         products, relaxed = quiz_logic.recommend_products(9, needs_wifi=True)
         titles = [p.title for p in products]
-        self.assertNotIn('AC Standard 9 no-wifi', titles)
-        # При пустой выдаче wifi снимается с релаксацией.
-        self.assertIn('wifi_relaxed', relaxed)
+        self.assertIn('Сплит-система Комфорт 9', titles)
+        self.assertNotIn('Сплит-система Стандарт 9', titles)
+        self.assertEqual(relaxed, [])
 
     def test_wifi_filter_via_description(self):
         # Товар без TechSpec, но с упоминанием Wi-Fi в description — пройдёт.
