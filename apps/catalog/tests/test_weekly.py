@@ -3,11 +3,11 @@
 Раньше карточка брала первый товар из отсортированной подборки, и одна и та
 же модель висела с начала лета (замечание владельца 2026-08-29).
 """
-from datetime import date
+from datetime import date, datetime
 
 from django.test import SimpleTestCase
 
-from apps.catalog.weekly import pick_weekly, week_key
+from apps.catalog.weekly import hour_key, pick_hourly, pick_weekly, week_key
 
 
 class WeekKeyTest(SimpleTestCase):
@@ -48,3 +48,33 @@ class PickWeeklyTest(SimpleTestCase):
 
     def test_single_item(self):
         self.assertEqual(pick_weekly(['only']), 'only')
+
+
+class PickHourlyTest(SimpleTestCase):
+    """Ротация раз в час: на 648 позициях недельный шаг слишком редкий."""
+
+    ITEMS = [f'item-{i}' for i in range(50)]
+
+    def test_stable_within_hour(self):
+        a = pick_hourly(self.ITEMS, now=datetime(2026, 8, 30, 14, 5))
+        b = pick_hourly(self.ITEMS, now=datetime(2026, 8, 30, 14, 59))
+        self.assertEqual(a, b)
+
+    def test_changes_next_hour(self):
+        a = pick_hourly(self.ITEMS, now=datetime(2026, 8, 30, 14, 30))
+        b = pick_hourly(self.ITEMS, now=datetime(2026, 8, 30, 15, 30))
+        self.assertNotEqual(a, b)
+
+    def test_many_variants_per_day(self):
+        picks = {
+            pick_hourly(self.ITEMS, now=datetime(2026, 8, 30, h, 0))
+            for h in range(24)
+        }
+        self.assertGreater(len(picks), 10, f'слишком мало вариантов за сутки: {len(picks)}')
+
+    def test_empty_and_single(self):
+        self.assertIsNone(pick_hourly([]))
+        self.assertEqual(pick_hourly(['only']), 'only')
+
+    def test_hour_key_format(self):
+        self.assertEqual(hour_key(datetime(2026, 8, 30, 9, 15)), '2026-08-30-09')

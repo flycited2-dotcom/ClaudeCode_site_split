@@ -195,15 +195,15 @@ ym({{ YANDEX_METRIKA_ID }},'init',{clickmap:true,trackLinks:true,accurateTrackBo
     });
   });
 
-  // Catalog: toggle ?with_order=1 в URL (показать/скрыть «под заказ»).
+  // Catalog: toggle ?in_stock=1 (только наличие ↔ весь ассортимент).
   // Простая полная перезагрузка — корректнее чем тянуть HTMX-сессию через
   // history API, и работает идентично из шапки и из сайдбара.
   window.toggleCatalogOrder = function() {
     var url = new URL(location.href);
-    if (url.searchParams.has('with_order')) {
-      url.searchParams.delete('with_order');
+    if (url.searchParams.has('in_stock')) {
+      url.searchParams.delete('in_stock');
     } else {
-      url.searchParams.set('with_order', '1');
+      url.searchParams.set('in_stock', '1');
     }
     url.searchParams.delete('page');  // сброс на первую страницу
     location.href = url.toString();

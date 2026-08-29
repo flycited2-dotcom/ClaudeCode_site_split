@@ -119,11 +119,14 @@ class CollectionViewTest(TestCase):
             self.assertNotContains(r, '{#')
             self.assertNotContains(r, '#}')
 
-    def test_under_order_hidden_by_default(self):
-        # Товар без крымского остатка виден только по ?with_order=1 —
-        # то же правило, что в каталоге
+    def test_under_order_visible_by_default(self):
+        """С 2026-08-30 подборка, как и каталог, по умолчанию показывает всё.
+
+        Товар без крымского остатка виден сразу; ?in_stock=1 сужает выдачу
+        до склада в Крыму.
+        """
         self._product('NC-ORDER', -25, qty=4, warehouse='Шерризон')
         r = self.client.get(reverse('collection', args=['heat-pumps']))
-        self.assertNotContains(r, 'NC-ORDER')
-        r2 = self.client.get(reverse('collection', args=['heat-pumps']), {'with_order': '1'})
-        self.assertContains(r2, 'NC-ORDER')
+        self.assertContains(r, 'NC-ORDER')
+        r2 = self.client.get(reverse('collection', args=['heat-pumps']), {'in_stock': '1'})
+        self.assertNotContains(r2, 'NC-ORDER')

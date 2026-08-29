@@ -67,22 +67,28 @@ class CatalogViewTest(TestCase):
         ncs = {p.nc_code for p in r.context['page_obj'].object_list}
         self.assertEqual(ncs, {'NC-active'})
 
-    def test_catalog_default_only_crimea_stock(self):
-        # Правило владельца (2026-05-24): по умолчанию каталог показывает
-        # только то, что физически на крымском складе.
+    def test_catalog_default_shows_everything_stock_first(self):
+        """Правило изменено 2026-08-30: по умолчанию виден весь ассортимент.
+
+        Раньше показывали только крымский склад, и в разделах вроде «Тепловые
+        завесы» висела одна позиция, а остальное пряталось за кнопкой. Теперь
+        видно всё, но товары в наличии идут первыми.
+        """
         self._make('NC-crimea', warehouse='Симферополь', qty=5)
         self._make('NC-moscow', warehouse='Москва', qty=10)
         r = self.client.get(reverse('catalog'))
-        ncs = {p.nc_code for p in r.context['page_obj'].object_list}
-        self.assertEqual(ncs, {'NC-crimea'})
+        items = list(r.context['page_obj'].object_list)
+        ncs = {p.nc_code for p in items}
+        self.assertEqual(ncs, {'NC-crimea', 'NC-moscow'})
+        self.assertEqual(items[0].nc_code, 'NC-crimea', 'наличие должно быть первым')
 
-    def test_catalog_with_order_param_includes_non_crimea(self):
-        # Opt-out через ?with_order=1 — показываем всё, включая «под заказ».
+    def test_catalog_in_stock_param_limits_to_crimea(self):
+        # ?in_stock=1 — сузить выдачу до того, что лежит на складе в Крыму.
         self._make('NC-crimea', warehouse='Симферополь', qty=5)
         self._make('NC-moscow', warehouse='Москва', qty=10)
-        r = self.client.get(reverse('catalog'), {'with_order': '1'})
+        r = self.client.get(reverse('catalog'), {'in_stock': '1'})
         ncs = {p.nc_code for p in r.context['page_obj'].object_list}
-        self.assertEqual(ncs, {'NC-crimea', 'NC-moscow'})
+        self.assertEqual(ncs, {'NC-crimea'})
 
     def test_product_detail_returns_200(self):
         p = self._make('NC-1')

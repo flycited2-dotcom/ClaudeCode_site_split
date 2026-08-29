@@ -85,7 +85,7 @@
         <a href="/catalog/" class="btn" style="background: rgba(255,255,255,0.10); color: #fff; border: 1px solid rgba(255,255,255,0.20);">
           Весь каталог &rarr;
         </a>
-        <a href="/quiz/" class="text-sm underline underline-offset-4 decoration-white/30 hover:decoration-white transition" style="color:#cbd8e8;">
+        <a href="/quiz/" class="btn" style="background: rgba(255,255,255,0.10); color: #fff; border: 1px solid rgba(255,255,255,0.20);">
           Подобрать за минуту
         </a>
       </div>
@@ -104,7 +104,7 @@
   <a href="{% if featured_one %}{% url 'product_detail' featured_one.slug %}{% else %}/catalog/{% endif %}"
      class="md:col-span-4 md:row-span-3 bg-white rounded-[28px] p-7 flex flex-col min-h-[460px] relative overflow-hidden group hover:shadow-lg transition">
     <div class="flex items-center justify-between">
-      <span class="eyebrow" style="color: var(--primary);">Хит недели</span>
+      <span class="eyebrow" style="color: var(--primary);">Выбор дня</span>
       <span class="chip chip-accent">−20%</span>
     </div>
     {% if featured_one %}

@@ -10,13 +10,13 @@ need to stay in sync with the filter sidebar on every change.
     <div class="flex items-center gap-3 flex-wrap">
       <p class="text-sm text-gray-500">
         Найдено: <span class="font-semibold text-gray-800">{{ page_obj.paginator.count }}</span> товаров
-        {% if request.GET.with_order %}<span class="ml-2 text-blue-600 text-xs font-semibold">● включая «под заказ»</span>{% else %}<span class="ml-2 text-green-600 text-xs font-semibold">● на складе в Крыму</span>{% endif %}
+        {% if request.GET.in_stock %}<span class="ml-2 text-green-600 text-xs font-semibold">● только на складе в Крыму</span>{% else %}<span class="ml-2 text-blue-600 text-xs font-semibold">● в наличии и под заказ</span>{% endif %}
       </p>
       {% comment %}Toggle: показать/скрыть «под заказ». Дублирует чекбокс в
       сайдбаре, но более заметно — пользователь видит причину малого числа
       товаров и сразу может расширить выдачу.{% endcomment %}
       <button type="button" onclick="toggleCatalogOrder()" class="catalog-toggle-btn">
-        {% if request.GET.with_order %}Только в наличии (Крым){% else %}Показать «под заказ»{% endif %}
+        {% if request.GET.in_stock %}Показать всё{% else %}Только в наличии (Крым){% endif %}
       </button>
     </div>
     <div class="flex items-center gap-2">

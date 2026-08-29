@@ -8,7 +8,7 @@ from django.http import Http404
 from .models import Product, Category, Brand
 from .collections import COLLECTIONS, get_collection
 from .navigation import group_categories
-from .weekly import pick_weekly
+from .weekly import pick_hourly
 from .filters import ProductFilter
 from .facets import compute_facets
 from .dynamic_filters import apply_tech_filters, compute_tech_facets
@@ -52,11 +52,15 @@ def home(request):
     # главная не должна продавать «под заказ из Москвы», правило владельца.
     # Brand ALFACOOL — exclude по решению владельца (2026-05-28): в каталоге
     # видны, на главной не нужны.
+    # «Хиты сезона» — весь ассортимент в наличии, а не только сплит-системы:
+    # с 2026-08-30 в каталоге ещё котлы, радиаторы, водонагреватели, конвекторы
+    # и обогреватели (замечание владельца — внизу главной висели одни
+    # кондиционеры). Условие «лежит в Симферополе» остаётся: главная не продаёт
+    # то, чего нет на складе.
     base_qs = (
         Product.objects
         .filter(is_active=True, category__sync_enabled=True,
                 stock__warehouse='Симферополь', stock__quantity__gt=0)
-        .filter(category__title__iregex=r'сплит.?систем')
         .filter(kind=Product.KIND_SPLIT_SYSTEM)
         .exclude(brand__title__iexact='ALFACOOL')
         .select_related('brand', 'stock')
@@ -68,12 +72,17 @@ def home(request):
         featured_buffer.extend(list(base_qs.filter(source=src)[:15]))
     featured = _balance_by_source(featured_buffer, per_source=3, total=8)
 
-    # «Хит недели» — крутится по номеру недели, а не берётся первым из
-    # отсортированной подборки: иначе одна и та же модель висит месяцами
-    # (замечание владельца 2026-08-29 — XIGMA стояла с начала лета).
-    # Кандидаты — весь буфер, а не только показанные восемь: так в ротацию
-    # попадает больше товара.
-    weekly_pick = pick_weekly(featured_buffer, salt='home-hit')
+    # Карточка справа крутится раз в час по ВСЕМ товарам в наличии: недельный
+    # шаг оказался слишком редким на 648 позициях (замечание владельца
+    # 2026-08-30). Берём id-шники, а не объекты — иначе тянули бы всю выборку.
+    pick_ids = list(base_qs.values_list('id', flat=True))
+    pick_id = pick_hourly(pick_ids, salt='home-hit')
+    weekly_pick = (
+        Product.objects.filter(pk=pick_id)
+        .select_related('brand', 'stock').prefetch_related('images', 'tech_values__spec')
+        .first()
+        if pick_id else None
+    )
 
     show_price = request.user.is_authenticated and getattr(request.user, 'is_approved', False)
     return render(request, 'home.html', {
@@ -89,7 +98,7 @@ def _catalog_base_qs(request):
     """Базовая выборка каталога: активные розничные товары включённых категорий.
 
     Вынесена из catalog(), чтобы страница подборки (collection) использовала ровно
-    ту же выборку — Крым-first, ?with_order, prefetch — и не разъезжалась с каталогом
+    ту же выборку — Крым-first, ?in_stock, prefetch — и не разъезжалась с каталогом
     при будущих правках.
 
     Stock.warehouse='Симферополь' выставляется в write_warehouse_stocks ТОЛЬКО когда
@@ -111,12 +120,13 @@ def _catalog_base_qs(request):
         .prefetch_related('images', 'tech_values__spec')
     )
 
-    # Правило владельца (2026-05-24): по умолчанию каталог показывает только
-    # то, что фактически лежит на крымском складе. Юзер может явно расширить
-    # выдачу до «под заказ» через `?with_order=1`. Бэкап URL для фильтров,
-    # категорий, поиска — без специальных условий, всё работает поверх
-    # сокращённого base_qs.
-    if not request.GET.get('with_order'):
+    # Правило изменено 2026-08-30 по решению владельца: раньше каталог по
+    # умолчанию показывал только крымский склад, и в разделах вроде «Тепловые
+    # завесы» висела одна позиция — остальное открывалось лишь по кнопке.
+    # Теперь по умолчанию видно ВЕСЬ ассортимент, а товары в наличии идут
+    # первыми (сортировка по is_crimea в catalog()). Показать только наличие —
+    # `?in_stock=1`.
+    if request.GET.get('in_stock'):
         base_qs = base_qs.filter(stock__warehouse='Симферополь',
                                  stock__quantity__gt=0)
     return base_qs

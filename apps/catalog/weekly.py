@@ -9,7 +9,7 @@
 а в понедельник сменяется сам собой.
 """
 import hashlib
-from datetime import date
+from datetime import date, datetime
 
 
 def week_key(today=None):
@@ -30,4 +30,24 @@ def pick_weekly(items, *, salt='', today=None):
     if not items:
         return None
     digest = hashlib.md5(f'{week_key(today)}|{salt}'.encode('utf-8')).hexdigest()
+    return items[int(digest, 16) % len(items)]
+
+
+def hour_key(now=None):
+    """Ключ часа: '2026-08-30-14'. Меняется каждый час."""
+    moment = now or datetime.now()
+    return moment.strftime('%Y-%m-%d-%H')
+
+
+def pick_hourly(items, *, salt='', now=None):
+    """Стабильный в пределах часа выбор одного элемента.
+
+    Ассортимент вырос до 14 тысяч позиций, и недельный шаг стал слишком
+    редким — витрина почти не обновляется. Час: посетитель в пределах сессии
+    видит одно и то же, а за день карточка сменится два десятка раз.
+    """
+    items = list(items)
+    if not items:
+        return None
+    digest = hashlib.md5(f'{hour_key(now)}|{salt}'.encode('utf-8')).hexdigest()
     return items[int(digest, 16) % len(items)]

@@ -336,3 +336,30 @@ class HeatingCategoriesTest(TestCase):
         """«Маслонаполненные радиаторы» должны остаться обогревателями."""
         from apps.sync.rusklimat_rest import _master_category_for
         self.assertEqual(_master_category_for('Маслонаполненные радиаторы').breez_id, 34)
+
+
+class HomeVentilationCategoryTest(TestCase):
+    """«Бытовая приточная вентиляция» Rusklimat (2026-08-30).
+
+    Фильтр ловил только «Компактные моноблочные приточные установки», а у
+    поставщика есть отдельный раздел бытовых приточек — владелец прислал
+    ссылку на него, товара в каталоге не было.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from apps.catalog.models import Category
+        Category.objects.get_or_create(breez_id=45, defaults={
+            'title': 'Компактные моноблочные вентиляционные установки', 'slug': 'cat-45'})
+        Category.objects.get_or_create(breez_id=2, defaults={
+            'title': 'Бытовые сплит-системы', 'slug': 'cat-2'})
+
+    def test_passes_filter(self):
+        from apps.sync.rusklimat_rest import _AC_CATEGORY_RE, _AC_EXCLUDE_RE
+        for name in ('Бытовая приточная вентиляция', 'Приточные очистители воздуха'):
+            self.assertTrue(_AC_CATEGORY_RE.search(name), name)
+            self.assertFalse(_AC_EXCLUDE_RE.search(name), name)
+
+    def test_goes_to_ventilation_category(self):
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(_master_category_for('Бытовая приточная вентиляция').breez_id, 45)

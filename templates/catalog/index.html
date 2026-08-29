@@ -51,7 +51,7 @@
             {% for cat in group_cats %}
               {% with cat_id_str=cat.pk|stringformat:'s' %}
               <div>
-                <a href="?category={{ cat.pk }}{% if not cat.product_count %}&with_order=1{% endif %}"
+                <a href="?category={{ cat.pk }}"
                    class="cat-btn {% if request.GET.category == cat_id_str and not request.GET.inverter and not request.GET.type %}is-active{% endif %}">
                   <span>{{ cat.title }}</span>
                   {% if cat.product_count %}

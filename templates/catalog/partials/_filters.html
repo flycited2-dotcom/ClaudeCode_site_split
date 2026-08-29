@@ -197,13 +197,13 @@ when parsing a response.
       </div>
     </div>
 
-    <!-- Включить под заказ -->
+    <!-- Ограничить выдачу складом -->
     <label class="mb-2 flex items-center gap-2 cursor-pointer select-none"
-           title="По умолчанию показываем только то, что физически на складе в Крыму.">
-      <input type="checkbox" name="with_order" value="1"
-             {% if request.GET.with_order %}checked{% endif %}
+           title="По умолчанию показываем весь ассортимент: сначала то, что на складе в Крыму, затем «под заказ».">
+      <input type="checkbox" name="in_stock" value="1"
+             {% if request.GET.in_stock %}checked{% endif %}
              class="w-4 h-4 accent-orange-500">
-      <span class="text-sm text-gray-700">Показать также «под заказ»</span>
+      <span class="text-sm text-gray-700">Только в наличии (Крым)</span>
     </label>
 
     {# Сброс фильтров сохраняет category+type (выбор раздела каталога). #}
