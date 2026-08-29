@@ -307,6 +307,8 @@ def sync_catalog():
     cats = sync_categories()
     brands = sync_brands()
     products = sync_products()
+    from apps.catalog.facets import invalidate_facets_cache
+    invalidate_facets_cache()   # счётчики фасет пересчитаются на первом заходе
     logger.info("sync_catalog complete: cats=%s brands=%s products=%s",
                 cats, brands, products)
     return {'categories': cats, 'brands': brands, 'products': products}

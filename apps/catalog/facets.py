@@ -28,6 +28,18 @@ def _facets_cache_key(get_data, scope):
     return 'catalog:facets:' + hashlib.md5(raw.encode('utf-8')).hexdigest()
 
 
+def invalidate_facets_cache():
+    """Сбрасывает кэш фасет — вызывается синками после обновления каталога.
+
+    Без этого счётчики в сайдбаре отставали бы до FACETS_CACHE_TTL после
+    каждого синка. Работает и для динамических фасет (общий префикс ключа).
+    """
+    try:
+        cache.delete_pattern('catalog:*facets:*')      # django_redis
+    except AttributeError:
+        cache.clear()                                   # бэкенд без delete_pattern
+
+
 def _apply_filters_excluding(get_data, exclude_key, base_qs):
     """Re-apply ProductFilter on base_qs, dropping `exclude_key` from query data
     so the resulting queryset shows what *other* filters constrain to.

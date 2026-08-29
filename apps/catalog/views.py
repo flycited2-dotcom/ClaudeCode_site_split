@@ -153,7 +153,7 @@ def catalog(request):
 
     facets = compute_facets(request.GET, base_qs, scope='catalog')
     selected_category = f.form.cleaned_data.get('category') if f.form.is_valid() else None
-    tech_facets = compute_tech_facets(request.GET, selected_category, filtered_qs)
+    tech_facets = compute_tech_facets(request.GET, selected_category, filtered_qs, scope='catalog')
 
     context = {
         'filter': f,
@@ -228,7 +228,8 @@ def collection(request, slug):
         'facets': compute_facets(request.GET, base_qs, scope=f'collection:{coll.slug}'),
         # Категория внутри подборки не выбрана — показываем глобальные фасеты
         # характеристик (см. compute_tech_facets).
-        'tech_facets': compute_tech_facets(request.GET, None, filtered_qs),
+        'tech_facets': compute_tech_facets(request.GET, None, filtered_qs,
+                                           scope=f'collection:{coll.slug}'),
     }
 
     template = (

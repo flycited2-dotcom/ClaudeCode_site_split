@@ -65,3 +65,34 @@ class FacetsCacheTest(TestCase):
         cache.clear()
         after = self._facets()
         self.assertNotEqual(before, after)
+
+
+class TechFacetsCacheTest(TestCase):
+    """Динамические фасеты (по характеристикам) — 20 запросов на страницу,
+    кэшируются той же логикой, что и статические."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.category = Category.objects.create(
+            title='Сплит-системы', slug='split-techfacets', sync_enabled=True,
+        )
+
+    def setUp(self):
+        cache.clear()
+
+    def test_second_call_hits_cache(self):
+        from apps.catalog.dynamic_filters import compute_tech_facets
+        qs = Product.objects.all()
+        first = compute_tech_facets(QueryDict(''), None, qs, scope='catalog')
+        with self.assertNumQueries(0):
+            second = compute_tech_facets(QueryDict(''), None, qs, scope='catalog')
+        self.assertEqual(first, second)
+
+    def test_scope_separates_cache(self):
+        from apps.catalog.dynamic_filters import compute_tech_facets
+        qs = Product.objects.all()
+        compute_tech_facets(QueryDict(''), None, qs, scope='catalog')
+        # у подборки свой ключ — запросы должны пойти заново, а не взяться из
+        # кэша каталога
+        with self.assertNumQueries(1):
+            compute_tech_facets(QueryDict(''), None, qs, scope='collection:heat-pumps')

@@ -519,5 +519,7 @@ def sync_rusklimat_rest(*, max_pages=None):
         'deactivated': deactivated,
         'tech_specs_total': len(tech_cache),
     }
+    from apps.catalog.facets import invalidate_facets_cache
+    invalidate_facets_cache()   # фасеты пересчитаются на первом заходе в каталог
     logger.info('Rusklimat REST sync: %s', summary)
     return summary

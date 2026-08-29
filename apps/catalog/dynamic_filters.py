@@ -19,6 +19,9 @@ group_key — id любого spec'а группы (используется min
 AND. Значения сравниваются регистронезависимо (iexact) — «Wi-Fi ready» и
 «Wi-Fi Ready» считаются одним и тем же значением.
 """
+import hashlib
+
+from django.core.cache import cache
 from django.db.models import Count, Min, Q
 from django.db.models.functions import Lower
 
@@ -118,10 +121,31 @@ def apply_tech_filters(get_data, qs, exclude_group_key=None):
     return qs.distinct() if applied else qs
 
 
-def compute_tech_facets(get_data, category, qs):
+# Каждая группа характеристик — отдельный GROUP BY по catalog_producttech:
+# 20 запросов на страницу каталога (замер на проде 2026-08-29). Значения зависят
+# только от данных синка, поэтому результат кэшируется — как и статические
+# фасеты (см. apps/catalog/facets.FACETS_CACHE_TTL).
+TECH_FACETS_CACHE_TTL = 600
+
+
+def _tech_facets_cache_key(get_data, category, scope):
+    params = sorted((k, sorted(v)) for k, v in get_data.lists() if k not in ('page', 'ordering'))
+    raw = f'{scope}|{category.pk if category else None}|{params}'
+    return 'catalog:techfacets:' + hashlib.md5(raw.encode('utf-8')).hexdigest()
+
+
+def compute_tech_facets(get_data, category, qs, scope='catalog'):
     """qs — уже отфильтрован по всем статическим ProductFilter-полям (включая
     category), но ДО tech-фильтров.
+
+    Результат кэшируется на TECH_FACETS_CACHE_TTL; `scope` разделяет кэш
+    каталога и подборок — у них разные выборки товаров.
     """
+    cache_key = _tech_facets_cache_key(get_data, category, scope)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     grouped_selected = parse_tech_params(get_data)
     groups = _spec_groups(category)
 
@@ -150,4 +174,6 @@ def compute_tech_facets(get_data, category, qs):
             options.append({'value': val, 'count': n, 'selected': is_selected})
         if options:
             result.append({'spec_id': group_key, 'title': title, 'options': options})
+
+    cache.set(cache_key, result, TECH_FACETS_CACHE_TTL)
     return result

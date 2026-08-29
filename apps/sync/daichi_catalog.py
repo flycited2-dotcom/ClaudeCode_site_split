@@ -475,6 +475,9 @@ def sync_catalog():
         created, updated, skipped_not_kit, skipped_no_category, deactivated,
         images_synced, specs_synced,
     )
+    from apps.catalog.facets import invalidate_facets_cache
+    invalidate_facets_cache()   # фасеты пересчитаются на первом заходе
+
     return {
         'created': created,
         'updated': updated,

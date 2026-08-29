@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.http import QueryDict
+from django.core.cache import cache
 from django.test import TestCase
 
 from apps.catalog.dynamic_filters import (
@@ -66,6 +67,10 @@ class DynamicFiltersDbTest(TestCase):
         cls.global_spec = TechSpec.objects.create(
             title='Тепловой насос', category=None, is_filter=True, order=4,
         )
+
+    def setUp(self):
+        # фасеты кэшируются — тесты меняют данные между вызовами
+        cache.clear()
 
     def _make(self, nc, category=None):
         return Product.objects.create(
@@ -192,6 +197,9 @@ class DynamicFiltersDbTest(TestCase):
         for i in range(_MAX_FACET_OPTIONS + 5):
             p = self._make(f'NC-series-{i}')
             ProductTech.objects.create(product=p, spec=series_spec, value=f'Series-{i}')
+        # Фасеты кэшируются; в проде кэш сбрасывает синк после обновления
+        # каталога (facets.invalidate_facets_cache), здесь — руками.
+        cache.clear()
         result = compute_tech_facets(_qd(), self.category, Product.objects.all())
         titles = {g['title'] for g in result}
         self.assertNotIn('Серия', titles)
