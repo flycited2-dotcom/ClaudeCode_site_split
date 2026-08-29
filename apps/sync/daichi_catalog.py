@@ -110,6 +110,19 @@ def _resolve_category(params):
     return Category.objects.filter(title__iexact=target_title, sync_enabled=True).first()
 
 
+def _is_syncable_group(params):
+    """True, если группа товара вообще едет в наш каталог.
+
+    Нужна до сетевого добора цен: раньше _is_kit пропускал всё, кроме
+    сплит-систем, и _prefetch_kit_wholesales делал точечные запросы к API
+    за ценой даже для VRF и чиллеров, которые потом отсекались по категории.
+    Отсюда 902 записи «no wholesale price» в ERROR-логе синка (2026-08-30) и
+    лишние минуты работы.
+    """
+    group = (params.get('ATTR_L_GOODGROUP') or '').strip()
+    return group in _GOODGROUP_TO_TITLE or group in _SPLIT_BY_RUS_NAME
+
+
 def _is_kit(params):
     """True, если товар можно показывать в каталоге.
 
@@ -364,7 +377,7 @@ def _prefetch_kit_wholesales(client, store_id, products):
         if not xml_id:
             continue
         params = e.get('PARAMS') or e.get('PARAMS:') or {}
-        if not _is_kit(params):
+        if not _is_syncable_group(params) or not _is_kit(params):
             continue
         w, _, _ = _extract_prices(e.get('PRICES') or e.get('PRICES:') or {})
         if w is not None:

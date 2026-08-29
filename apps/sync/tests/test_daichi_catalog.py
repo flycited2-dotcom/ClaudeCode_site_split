@@ -81,11 +81,11 @@ class FetchAllProductparamsTest(SimpleTestCase):
         self.assertEqual(client.calls, [1])
 
 
-def _kit_entry(xml_id, name='KIT-1/KIT-2'):
+def _kit_entry(xml_id, name='KIT-1/KIT-2', goodgroup='Бытовые сплит-системы'):
     return {
         'XML_ID': xml_id,
         'NAME': name,
-        'PARAMS': {'ATTR_L_GOODTYPE': 'Комплект'},
+        'PARAMS': {'ATTR_L_GOODTYPE': 'Комплект', 'ATTR_L_GOODGROUP': goodgroup},
         'PRICES': {},  # BASE пуст — типичный кейс из массового дампа
     }
 
@@ -113,6 +113,20 @@ class PrefetchKitWholesalesTest(SimpleTestCase):
         error_logs = [r for r in cm.records if r.levelname == 'ERROR']
         self.assertEqual(len(error_logs), 1)
         self.assertIn('kit-xml-2', error_logs[0].getMessage())
+
+    def test_group_outside_catalog_not_fetched(self):
+        """За ценой VRF/чиллеров в API не ходим — они всё равно отсеются.
+
+        Регрессия 2026-08-30: после снятия жёсткого требования «комплект»
+        добор цен пошёл по всем группам, дав 902 ложные ERROR-записи и
+        лишние минуты синка.
+        """
+        products = {'1': _kit_entry('vrf-xml', goodgroup='VRF-системы')}
+        client = FakeClient(targeted_price=Decimal('999'))
+        with self.assertLogs('apps.sync.daichi_catalog', level='INFO') as cm:
+            recovered = _prefetch_kit_wholesales(client, 'default', products)
+        self.assertEqual(recovered, {})
+        self.assertFalse(any(r.levelname == 'ERROR' for r in cm.records))
 
 
 class ResolveCategoryTest(TestCase):
