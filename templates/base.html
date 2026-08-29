@@ -173,6 +173,28 @@ ym({{ YANDEX_METRIKA_ID }},'init',{clickmap:true,trackLinks:true,accurateTrackBo
     if (e.target) window.prefillPhoneInputs(e.target);
   });
 
+  // Отклик на переход по кнопке. Каталог отвечает ~1 с, на мобильной сети до
+  // первой отрисовки проходит несколько секунд — без обратной связи человек
+  // думает, что кнопка не работает, и жмёт снова (в логах прода 2026-08-29:
+  // шесть тапов подряд и два оборванных запроса с кодом 499).
+  document.addEventListener('click', function(e) {
+    var a = e.target.closest && e.target.closest('a.btn');
+    if (!a || a.classList.contains('is-loading')) return;
+    var href = a.getAttribute('href') || '';
+    // Только настоящие переходы: не якоря, не новые вкладки, не htmx-ссылки
+    if (!href || href.charAt(0) === '#' || href.indexOf('javascript:') === 0) return;
+    if (a.target === '_blank' || a.hasAttribute('download') || a.hasAttribute('hx-get')) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    a.classList.add('is-loading');
+  });
+  // Возврат «назад» отдаёт страницу из bfcache в прежнем состоянии — снимаем
+  // блокировку, иначе кнопка останется неактивной.
+  window.addEventListener('pageshow', function() {
+    document.querySelectorAll('a.btn.is-loading').forEach(function(el) {
+      el.classList.remove('is-loading');
+    });
+  });
+
   // Catalog: toggle ?with_order=1 в URL (показать/скрыть «под заказ»).
   // Простая полная перезагрузка — корректнее чем тянуть HTMX-сессию через
   // history API, и работает идентично из шапки и из сайдбара.

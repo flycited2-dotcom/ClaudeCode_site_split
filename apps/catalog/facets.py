@@ -1,3 +1,6 @@
+import hashlib
+
+from django.core.cache import cache
 from django.db.models import Count, Q
 
 from .models import Brand
@@ -5,6 +8,24 @@ from .filters import (
     BTU_VALUES, AREA_CHOICES, INVERTER_CHOICES, COLOR_CHOICES, HEATING_CHOICES,
     ProductFilter, _btu_q, _area_q, _color_q, _heating_q,
 )
+
+# Счётчик каждого значения фасеты считается отдельным запросом (11 на BTU, 6 на
+# площадь, 4 на цвет, 3 на обогрев, 2 на инвертор + пересборка queryset на
+# группу) — 54 запроса к БД и ~1 с на страницу каталога (замер на проде
+# 2026-08-29; посетители не дожидались и жали кнопку повторно). Счётчики зависят
+# только от данных синка, который идёт раз в час, поэтому результат кэшируется.
+FACETS_CACHE_TTL = 600  # 10 минут: после синка цифры обновятся с этой задержкой
+
+
+def _facets_cache_key(get_data, scope):
+    """Ключ кэша: набор фильтров в URL + область выдачи.
+
+    `scope` обязателен: каталог и подборка считают фасеты по разным выборкам,
+    и без него страница подборки получила бы счётчики каталога.
+    """
+    params = sorted((k, sorted(v)) for k, v in get_data.lists() if k not in ('page', 'ordering'))
+    raw = f'{scope}|{params}'
+    return 'catalog:facets:' + hashlib.md5(raw.encode('utf-8')).hexdigest()
 
 
 def _apply_filters_excluding(get_data, exclude_key, base_qs):
@@ -18,13 +39,21 @@ def _apply_filters_excluding(get_data, exclude_key, base_qs):
     return ProductFilter(data, queryset=base_qs).qs
 
 
-def compute_facets(get_data, base_qs):
+def compute_facets(get_data, base_qs, scope='catalog'):
     """Return facet groups (with counts) for the catalog sidebar.
 
     Each group's count is computed against `base_qs` filtered by every other
     active group except itself. Selected entries with count=0 are kept so the
     user can see and un-tick them.
+
+    Результат кэшируется на FACETS_CACHE_TTL — см. комментарий у константы.
+    `scope` разделяет кэш каталога и подборок (у них разные base_qs).
     """
+    cache_key = _facets_cache_key(get_data, scope)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     selected_brand_ids = {str(v) for v in get_data.getlist('brand')}
     selected_btu = set(get_data.getlist('btu'))
     selected_area = set(get_data.getlist('area'))
@@ -125,7 +154,7 @@ def compute_facets(get_data, base_qs):
             'selected': code in selected_heating,
         })
 
-    return {
+    result = {
         'brand':    brand_facet,
         'btu':      btu_facet,
         'area':     area_facet,
@@ -133,3 +162,5 @@ def compute_facets(get_data, base_qs):
         'color':    color_facet,
         'heating':  heating_facet,
     }
+    cache.set(cache_key, result, FACETS_CACHE_TTL)
+    return result

@@ -151,7 +151,7 @@ def catalog(request):
         .order_by('order', 'title')
     )
 
-    facets = compute_facets(request.GET, base_qs)
+    facets = compute_facets(request.GET, base_qs, scope='catalog')
     selected_category = f.form.cleaned_data.get('category') if f.form.is_valid() else None
     tech_facets = compute_tech_facets(request.GET, selected_category, filtered_qs)
 
@@ -225,7 +225,7 @@ def collection(request, slug):
         'collection': coll,
         'show_price': request.user.is_authenticated and request.user.is_approved,
         'current_ordering': ordering_key,
-        'facets': compute_facets(request.GET, base_qs),
+        'facets': compute_facets(request.GET, base_qs, scope=f'collection:{coll.slug}'),
         # Категория внутри подборки не выбрана — показываем глобальные фасеты
         # характеристик (см. compute_tech_facets).
         'tech_facets': compute_tech_facets(request.GET, None, filtered_qs),

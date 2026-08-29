@@ -129,6 +129,26 @@ h1, h2, h3, h4 {
 }
 .btn-sm { padding: 9px 14px; font-size: 13px; }
 
+/* Кнопка в процессе перехода: спиннер + защита от повторных тапов.
+   Каталог отвечает ~1 с, на мобильной сети до отрисовки проходит несколько
+   секунд, и без отклика человек жмёт кнопку снова (логи прода 2026-08-29). */
+.btn.is-loading {
+  pointer-events: none;
+  opacity: .75;
+}
+.btn.is-loading::after {
+  content: "";
+  width: 15px; height: 15px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin .6s linear infinite;
+}
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .btn.is-loading::after { animation-duration: 2s; }
+}
+
 /* ── chip / badge ── */
 .chip {
   display: inline-flex; align-items: center; gap: 6px;
