@@ -20,12 +20,24 @@ _multi_split_re = re.compile(MULTI_SPLIT_BLOCK_PATTERN, re.IGNORECASE)
 _non_retail_re = re.compile(NON_RETAIL_PATTERN, re.IGNORECASE)
 
 
+# Самостоятельные товары, чьё название начинается со слова из денилиста.
+# «Очиститель воздуха приточный» (бризеры Ballu ONEAIR и т.п.) — полноценный
+# прибор, но слово «очистител» стоит в NON_RETAIL_PATTERN как расходник
+# («очиститель системы», чистящее средство). Проверяем такие раньше денилиста.
+RETAIL_OVERRIDE_PATTERN = (
+    r'очистител\w*\s+воздуха?\s+приточн|приточн\w*\s+очистител'
+)
+_retail_override_re = re.compile(RETAIL_OVERRIDE_PATTERN, re.IGNORECASE)
+
+
 def classify_title(title):
     """Возвращает Product.KIND_* по названию товара."""
     if not title:
         return Product.KIND_SPLIT_SYSTEM
     if _multi_split_re.search(title):
         return Product.KIND_MULTI_SPLIT_BLOCK
+    if _retail_override_re.search(title):
+        return Product.KIND_SPLIT_SYSTEM
     if _non_retail_re.search(title):
         return Product.KIND_ACCESSORY
     return Product.KIND_SPLIT_SYSTEM
