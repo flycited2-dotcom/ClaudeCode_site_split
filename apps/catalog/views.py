@@ -8,6 +8,7 @@ from django.http import Http404
 from .models import Product, Category, Brand
 from .collections import COLLECTIONS, get_collection
 from .navigation import group_categories
+from .weekly import pick_weekly
 from .filters import ProductFilter
 from .facets import compute_facets
 from .dynamic_filters import apply_tech_filters, compute_tech_facets
@@ -66,11 +67,20 @@ def home(request):
     for src in ('breeze', 'rusklimat', 'daichi'):
         featured_buffer.extend(list(base_qs.filter(source=src)[:15]))
     featured = _balance_by_source(featured_buffer, per_source=3, total=8)
+
+    # «Хит недели» — крутится по номеру недели, а не берётся первым из
+    # отсортированной подборки: иначе одна и та же модель висит месяцами
+    # (замечание владельца 2026-08-29 — XIGMA стояла с начала лета).
+    # Кандидаты — весь буфер, а не только показанные восемь: так в ротацию
+    # попадает больше товара.
+    weekly_pick = pick_weekly(featured_buffer, salt='home-hit')
+
     show_price = request.user.is_authenticated and getattr(request.user, 'is_approved', False)
     return render(request, 'home.html', {
         'brands': brands,
         'categories': categories,
         'featured': featured,
+        'weekly_pick': weekly_pick,
         'show_price': show_price,
     })
 
