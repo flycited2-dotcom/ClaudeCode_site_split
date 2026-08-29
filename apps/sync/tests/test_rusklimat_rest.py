@@ -250,3 +250,38 @@ class MasterCategoryMapTest(TestCase):
                      'Электрические тепловые пушки', 'Бытовые осушители воздуха'):
             self.assertTrue(_AC_CATEGORY_RE.search(name), name)
             self.assertFalse(_AC_EXCLUDE_RE.search(name), name)
+
+
+class OilRadiatorCategoryTest(TestCase):
+    """У Rusklimat раздел называется «Маслонаполненные радиаторы».
+
+    Наш фильтр искал «масляные» и промахивался — 9 позиций с крымским
+    остатком не доезжали (поймано владельцем 2026-08-29 по дереву каталога).
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from apps.catalog.models import Category
+        for breez_id, title in ((2, 'Бытовые сплит-системы'), (34, 'Масляные радиаторы'),
+                                (37, 'Тепловые пушки')):
+            Category.objects.get_or_create(
+                breez_id=breez_id, defaults={'title': title, 'slug': f'cat-{breez_id}'},
+            )
+
+    def test_oil_radiators_pass_filter(self):
+        from apps.sync.rusklimat_rest import _AC_CATEGORY_RE, _AC_EXCLUDE_RE
+        name = 'Маслонаполненные радиаторы'
+        self.assertTrue(_AC_CATEGORY_RE.search(name))
+        self.assertFalse(_AC_EXCLUDE_RE.search(name))
+
+    def test_oil_radiators_go_to_oil_radiators(self):
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(_master_category_for('Маслонаполненные радиаторы').breez_id, 34)
+
+    def test_gas_heat_guns_pass_filter(self):
+        from apps.sync.rusklimat_rest import _AC_CATEGORY_RE
+        self.assertTrue(_AC_CATEGORY_RE.search('Газовые тепловые пушки'))
+
+    def test_gas_heat_guns_go_to_heat_guns(self):
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(_master_category_for('Газовые тепловые пушки').breez_id, 37)
