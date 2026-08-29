@@ -285,3 +285,54 @@ class OilRadiatorCategoryTest(TestCase):
     def test_gas_heat_guns_go_to_heat_guns(self):
         from apps.sync.rusklimat_rest import _master_category_for
         self.assertEqual(_master_category_for('Газовые тепловые пушки').breez_id, 37)
+
+
+class HeatingCategoriesTest(TestCase):
+    """Отопление здания: радиаторы и тёплый пол (2026-08-29).
+
+    Берём и то, чего нет на крымском складе — владелец просил показывать
+    такие позиции «под заказ», а не прятать.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from apps.catalog.models import Category
+        Category.objects.get_or_create(breez_id=34, defaults={
+            'title': 'Масляные радиаторы', 'slug': 'cat-34'})
+        Category.objects.get_or_create(title='Радиаторы отопления', defaults={
+            'slug': 'radiatory-otopleniya', 'sync_enabled': True})
+        Category.objects.get_or_create(title='Тёплый пол', defaults={
+            'slug': 'teplyy-pol', 'sync_enabled': True})
+
+    def test_radiators_pass_filter(self):
+        from apps.sync.rusklimat_rest import _AC_CATEGORY_RE, _AC_EXCLUDE_RE
+        for name in ('Радиаторы биметаллические секционные', 'Радиаторы стальные панельные',
+                     'Радиаторы секционные', 'Нагревательные маты для теплого пола'):
+            self.assertTrue(_AC_CATEGORY_RE.search(name), name)
+            self.assertFalse(_AC_EXCLUDE_RE.search(name), name)
+
+    def test_radiator_accessories_still_excluded(self):
+        from apps.sync.rusklimat_rest import _AC_CATEGORY_RE, _AC_EXCLUDE_RE
+        for name in ('Кронштейны для радиаторов отопления', 'Комплектующие для теплых полов',
+                     'Отражатели для радиаторов отопления'):
+            passes = _AC_CATEGORY_RE.search(name) and not _AC_EXCLUDE_RE.search(name)
+            self.assertFalse(passes, name)
+
+    def test_radiators_go_to_own_category(self):
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(
+            _master_category_for('Радиаторы биметаллические секционные').title,
+            'Радиаторы отопления',
+        )
+
+    def test_warm_floor_goes_to_own_category(self):
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(
+            _master_category_for('Нагревательные маты для теплого пола').title,
+            'Тёплый пол',
+        )
+
+    def test_oil_radiators_not_hijacked_by_radiator_rule(self):
+        """«Маслонаполненные радиаторы» должны остаться обогревателями."""
+        from apps.sync.rusklimat_rest import _master_category_for
+        self.assertEqual(_master_category_for('Маслонаполненные радиаторы').breez_id, 34)
