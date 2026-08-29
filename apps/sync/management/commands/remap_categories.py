@@ -4,15 +4,26 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.text import slugify
 
+from apps.catalog.management.commands.enable_retail_categories import (
+    OWN_CATEGORIES, RETAIL_CATEGORIES,
+)
 from apps.catalog.models import Category, Product
 
 
 # Master breez_ids and titles must match ensure_master_categories migration.
-MASTER_BREEZ_IDS = {2, 9, 10}
+# Розничные категории (обогрев, водонагреватели, вентиляция...) добавлены
+# 2026-08-29: без них эта команда выключала их сразу после включения, потому
+# что «мастером» считались только пять категорий кондиционеров.
+MASTER_BREEZ_IDS = {2, 9, 10} | set(RETAIL_CATEGORIES)
 MASTER_TITLES = {
     'Полупромышленные кондиционеры',
     'Аксессуары для кондиционеров',
-}
+} | set(OWN_CATEGORIES)
+
+# Товары этих категорий не переназначаем по названию: правило «настенн|бытов»
+# утащило бы настенный конвектор в бытовые сплит-системы.
+_KEEP_CATEGORY_BREEZ_IDS = set(RETAIL_CATEGORIES)
+_KEEP_CATEGORY_TITLES = set(OWN_CATEGORIES)
 
 
 # 5 master catalog categories shown in sidebar:
@@ -109,6 +120,12 @@ class Command(BaseCommand):
             cat = product.category
             if cat is None:
                 counters['no_category'] += 1
+                continue
+
+            # Розничная техника уже лежит в своей категории — правила
+            # переназначения написаны под кондиционеры и только навредят.
+            if cat.breez_id in _KEEP_CATEGORY_BREEZ_IDS or cat.title in _KEEP_CATEGORY_TITLES:
+                counters['unchanged'] += 1
                 continue
 
             path = f'{cat.parent.title} - {cat.title}' if cat.parent_id else cat.title
