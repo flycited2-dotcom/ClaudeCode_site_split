@@ -250,3 +250,56 @@ class SyncCatalogTest(TestCase):
         result = self._run([{'article': '', 'name': '', 'category': 'Бытовые сплит-системы',
                              'brand': 'MDV', 'attributes': {}}])
         self.assertEqual(result['skipped_no_article'], 1)
+
+
+class BrandFallbackTest(TestCase):
+    """Защита от испорченного снимка (2026-08-30).
+
+    Портал сменил разметку: в свежих выгрузках brand и series пустые у всех
+    581 позиции. Пустышка не должна затирать уже известный бренд — без него
+    рассыпается название карточки, фильтры и Vendor в фиде Авито.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        Category.objects.create(title='Бытовые сплит-системы', slug='jac-brand-split',
+                                sync_enabled=True)
+
+    _run = SyncCatalogTest._run
+
+    def test_brand_taken_from_specs_when_snapshot_empty(self):
+        result = self._run(
+            [_row('EKSA-70HN', brand='', series='')],
+            specs={'EKSA-70HN': {'brand': 'EUROKLIMAT', 'series': 'Alba',
+                                 'characteristics': {'Холод, кВт': '2.6'}}},
+        )
+        p = Product.objects.get(source='jac')
+        self.assertEqual(p.brand.title, 'EUROKLIMAT')
+        self.assertEqual(p.series, 'Alba')
+        self.assertEqual(result['brand_recovered'], 1)
+
+    def test_known_brand_survives_empty_snapshot(self):
+        """Второй прогон с пустым брендом не должен обнулить карточку."""
+        self._run([_row('MDSA-36HRN1', brand='MDV', series='AURORA')])
+        self._run([_row('MDSA-36HRN1', brand='', series='')])
+        p = Product.objects.get(source='jac')
+        self.assertEqual(p.brand.title, 'MDV')
+        self.assertEqual(p.series, 'AURORA')
+
+    def test_snapshot_wins_over_specs(self):
+        """Непустое значение снимка приоритетнее файла характеристик."""
+        self._run(
+            [_row('ART-1', brand='THAICON', series='Fresh')],
+            specs={'ART-1': {'brand': 'MDV', 'series': 'Старая'}},
+        )
+        p = Product.objects.get(source='jac')
+        self.assertEqual(p.brand.title, 'THAICON')
+        self.assertEqual(p.series, 'Fresh')
+
+    def test_new_item_without_brand_anywhere_is_counted(self):
+        """Новой позиции бренд взять неоткуда — считаем и предупреждаем."""
+        result = self._run([_row('NEW-1', brand='', series='')])
+        self.assertEqual(result['brand_missing'], 1)
+        p = Product.objects.get(source='jac')
+        self.assertIsNone(p.brand)
+        self.assertTrue(p.title.startswith('Сплит-система'))

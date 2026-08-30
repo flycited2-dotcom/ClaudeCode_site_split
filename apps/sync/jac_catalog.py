@@ -145,6 +145,33 @@ def _nc_code(article, taken=frozenset()):
     return _hashed_nc_code(article)
 
 
+def _identity_from(row, specs_entry, existing):
+    """(бренд, серия) для товара — с защитой от испорченного снимка.
+
+    2026-08-30: портал сменил разметку, и в свежих выгрузках brand и series
+    пустые у ВСЕХ позиций (581 из 581). Пустышка затёрла бы бренд у уже
+    заведённых карточек, а без бренда рассыпается и название товара, и
+    фильтры, и Vendor в фиде Авито.
+
+    Порядок доверия: снимок → файл характеристик → то, что уже в базе.
+    """
+    brand = (row.get('brand') or '').strip()
+    series = (row.get('series') or '').strip()
+
+    if not brand:
+        brand = ((specs_entry or {}).get('brand') or '').strip()
+    if not series:
+        series = ((specs_entry or {}).get('series') or '').strip()
+
+    if existing is not None:
+        if not brand and existing.brand_id:
+            brand = existing.brand.title
+        if not series and existing.series:
+            series = existing.series
+
+    return brand, series
+
+
 def _get_or_create_brand(title):
     if not title:
         return None
@@ -274,6 +301,7 @@ def sync_catalog():
     )
 
     created = updated = skipped_no_category = skipped_no_article = 0
+    brand_recovered = brand_missing = 0
     images_synced = specs_synced = 0
     seen_nc_codes = set()
     tech_cache = {}
@@ -294,15 +322,23 @@ def sync_catalog():
                 skipped_no_category += 1
                 continue
 
-            brand = _get_or_create_brand((row.get('brand') or '').strip())
-            brand_title = brand.title if brand else ''
-            series = (row.get('series') or '').strip()
             attributes = row.get('attributes') or {}
 
             nc_code = _nc_code(article, taken_nc_codes)
             if nc_code in seen_nc_codes:
                 continue
             seen_nc_codes.add(nc_code)
+
+            spec_entry = specs.get(article) or {}
+            existing = Product.objects.filter(nc_code=nc_code).first()
+            brand_title, series = _identity_from(row, spec_entry, existing)
+            if not (row.get('brand') or '').strip():
+                if brand_title:
+                    brand_recovered += 1
+                else:
+                    brand_missing += 1
+            brand = _get_or_create_brand(brand_title)
+            brand_title = brand.title if brand else ''
 
             title = _build_title(brand_title, (row.get('category') or '').strip(), series, article)
             slug = _build_slug(brand_title, article, nc_code)
@@ -369,6 +405,13 @@ def sync_catalog():
         'skipped_no_article': skipped_no_article,
         'deactivated': deactivated,
         'images_synced': images_synced, 'specs_synced': specs_synced,
+        'brand_recovered': brand_recovered, 'brand_missing': brand_missing,
     }
+    if brand_missing:
+        # Бренд не удалось взять ни из снимка, ни из характеристик, ни из БД:
+        # карточка уедет без производителя — в фиде Авито Vendor обязателен.
+        logger.warning('JAC sync: %d позиций без бренда', brand_missing)
+    if brand_recovered:
+        logger.info('JAC sync: бренд восстановлен для %d позиций', brand_recovered)
     logger.info('JAC sync: %s', result)
     return result
