@@ -30,6 +30,10 @@ services:
     volumes:
       - static_files:/app/staticfiles
       - media_files:/app/media
+      # Выгрузка Профконда (b2b-jac.com) от скрапера osatakti_mdv_b2b — те же
+      # файлы читает Telegram-бот остатков. Только на чтение: пишет сюда
+      # скрапер, сайт лишь забирает (см. apps/sync/jac_catalog.py).
+      - /opt/splithub_api_telegram/data:/data/jac:ro
     ports:
       - "8000:8000"
     env_file: .env
@@ -48,6 +52,9 @@ services:
     build: .
     restart: always
     command: celery -A splithome worker -l info -c 2
+    volumes:
+      # sync_jac выполняется воркером — ему нужны те же файлы, что и web.
+      - /opt/splithub_api_telegram/data:/data/jac:ro
     env_file: .env
     extra_hosts:
       # Notification tasks use the same IPv6 Telegram proxy as the web app.
