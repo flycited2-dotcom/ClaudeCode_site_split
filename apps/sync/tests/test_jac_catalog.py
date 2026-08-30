@@ -157,12 +157,47 @@ class SyncCatalogTest(TestCase):
         self.assertFalse(Product.objects.get(articul='GONE-1').is_active)
         self.assertTrue(Product.objects.get(articul='STAY-1').is_active)
 
-    def test_long_article_fits_nc_code(self):
+    def test_nc_code_is_the_article(self):
+        """Ключ читаемый: avito-bridge строит из него supplier_sku
+        («jac:MDSA-36HRN1 / MDOA-36HN1») и показывает в диагностике."""
+        self._run([_row('MDSA-36HRN1 / MDOA-36HN1')])
+        p = Product.objects.get(source='jac')
+        self.assertEqual(p.nc_code, 'MDSA-36HRN1 / MDOA-36HN1')
+
+    def test_long_article_falls_back_to_hash(self):
         """У портала артикул бывает длиннее поля nc_code (50 символов)."""
         long_article = '17310900A06402 Wi-Fi модуль для полупромышленных систем ' * 2
         self._run([_row(long_article.strip())])
         p = Product.objects.get(source='jac')
         self.assertLessEqual(len(p.nc_code), 50)
+        self.assertTrue(p.nc_code.startswith('jac-'))
+        self.assertEqual(p.articul, long_article.strip()[:200])
+
+    def test_nc_code_collision_with_other_supplier(self):
+        """Артикул портала не должен затереть товар другого поставщика.
+
+        nc_code уникален по всей таблице, и update_or_create по занятому
+        коду перезаписал бы чужую карточку.
+        """
+        other = Product.objects.create(
+            nc_code='НС-1690797', articul='НС-1690797', title='Чужой товар',
+            slug='chuzhoy-tovar', source='breeze',
+            category=Category.objects.filter(title='Бытовые сплит-системы').first(),
+        )
+        self._run([_row('НС-1690797')])
+        other.refresh_from_db()
+        self.assertEqual(other.title, 'Чужой товар')
+        self.assertEqual(other.source, 'breeze')
+        jac = Product.objects.get(source='jac')
+        self.assertTrue(jac.nc_code.startswith('jac-'))
+        self.assertEqual(jac.articul, 'НС-1690797')
+
+    def test_hash_is_stable_across_runs(self):
+        long_article = 'X' * 60
+        self._run([_row(long_article)])
+        first = Product.objects.get(source='jac').nc_code
+        self._run([_row(long_article)])
+        self.assertEqual(Product.objects.get(source='jac').nc_code, first)
 
     def test_specs_written_and_btu_computed(self):
         """«Холод, кВт» переименовывается в общее название — иначе мощность

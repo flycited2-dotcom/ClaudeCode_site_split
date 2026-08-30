@@ -120,11 +120,29 @@ def _price(raw):
         return None
 
 
-def _nc_code(article):
-    """Стабильный ключ товара: у портала нет NC-кода, а артикул бывает длиннее
-    поля nc_code (50 символов). Хешируем — сам артикул хранится в `articul`."""
+NC_CODE_MAX = 50
+
+
+def _hashed_nc_code(article):
+    """Фолбэк-ключ. Считается от полного неизменённого артикула."""
     digest = hashlib.md5(article.encode('utf-8')).hexdigest()[:16]
     return f'jac-{digest}'
+
+
+def _nc_code(article, taken=frozenset()):
+    """Ключ товара: у портала нет NC-кода, поэтому берём сам артикул.
+
+    Читаемый ключ важен за пределами сайта: avito-bridge строит из него
+    supplier_sku («jac:MDSA-36HRN1 / MDOA-36HN1») и показывает его в
+    диагностике и выгрузках — по хешу модель не опознать.
+
+    Хешируем только когда иначе нельзя: артикул не влезает в поле (50
+    символов — таких 23 из 441) либо такой nc_code уже занят другим
+    поставщиком. Затереть чужой товар куда хуже, чем нечитаемый ключ.
+    """
+    if len(article) <= NC_CODE_MAX and article not in taken:
+        return article
+    return _hashed_nc_code(article)
 
 
 def _get_or_create_brand(title):
@@ -249,6 +267,12 @@ def sync_catalog():
         else:
             logger.warning('JAC sync: нет включённой категории «%s»', target_title)
 
+    # nc_code уникален по всей таблице: артикул портала не должен затереть
+    # товар другого поставщика с таким же кодом.
+    taken_nc_codes = set(
+        Product.objects.exclude(source=JAC_SOURCE).values_list('nc_code', flat=True)
+    )
+
     created = updated = skipped_no_category = skipped_no_article = 0
     images_synced = specs_synced = 0
     seen_nc_codes = set()
@@ -275,7 +299,7 @@ def sync_catalog():
             series = (row.get('series') or '').strip()
             attributes = row.get('attributes') or {}
 
-            nc_code = _nc_code(article)
+            nc_code = _nc_code(article, taken_nc_codes)
             if nc_code in seen_nc_codes:
                 continue
             seen_nc_codes.add(nc_code)
