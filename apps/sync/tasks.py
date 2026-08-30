@@ -55,10 +55,14 @@ def sync_categories():
         slug = raw_slug or f"cat-{item_id}"
         if Category.objects.filter(slug=slug).exclude(breez_id=item_id).exists():
             slug = f"{slug}-{item_id}"
+        # Наши названия разделов держатся поверх справочника поставщика —
+        # иначе слияние дублей откатывается на следующем же синке.
+        from apps.catalog.navigation import CATEGORY_TITLE_OVERRIDES
+        title = CATEGORY_TITLE_OVERRIDES.get(item_id, item.get('title', ''))
         _, is_new = Category.objects.update_or_create(
             breez_id=item_id,
             defaults={
-                'title': item.get('title', ''),
+                'title': title,
                 'slug': slug,
                 'order': int(item.get('order', 0) or 0),
             }
