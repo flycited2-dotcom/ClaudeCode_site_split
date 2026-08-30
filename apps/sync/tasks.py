@@ -342,6 +342,15 @@ def sync_daichi():
     return result
 
 
+@shared_task(name='sync.sync_jac')
+def sync_jac():
+    """Загружает выгрузку Профконда (b2b-jac.com) из файлов скрапера."""
+    from apps.sync.jac_catalog import sync_catalog as jac_sync
+    result = jac_sync()
+    logger.info('sync_jac: %s', result)
+    return result
+
+
 @shared_task(name='sync.refresh_rusklimat_jwt')
 def refresh_rusklimat_jwt():
     """Обновляет JWT для Rusklimat REST. Запускается Celery Beat в 23:50 МСК

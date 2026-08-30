@@ -161,6 +161,13 @@ DAICHI_ACCESS_TOKEN = config('DAICHI_ACCESS_TOKEN', default='')
 DAICHI_BASE_URL = config('DAICHI_BASE_URL', default='https://api.daichi.ru/b2b/v1/')
 DAICHI_STORE_ID = config('DAICHI_STORE_ID', default='default')
 
+# Профконд (b2b-jac.com): API нет, данные приходят файлами от скрапера
+# `osatakti_mdv_b2b` — те же, что читает Telegram-бот остатков.
+# Пусто → sync_jac ничего не делает и не трогает уже загруженные товары.
+JAC_STOCK_JSON = config('JAC_STOCK_JSON', default='')
+JAC_SPECS_JSON = config('JAC_SPECS_JSON', default='')
+JAC_PHOTOS_JSON = config('JAC_PHOTOS_JSON', default='')
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = config('EMAIL_HOST', default='')
 EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
