@@ -71,6 +71,7 @@ TEMPLATES = [{
             'apps.catalog.context_processors.yandex_metrika',
             'apps.catalog.context_processors.seo_verification',
             'apps.catalog.context_processors.static_version',
+            'apps.catalog.context_processors.site_contacts',
         ],
     },
 }]
@@ -181,6 +182,14 @@ TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
 TELEGRAM_CHAT_ID = config('TELEGRAM_CHAT_ID', default='')
 TELEGRAM_API_URL = config('TELEGRAM_API_URL', default='https://api.telegram.org')
 YANDEX_METRIKA_ID = config('YANDEX_METRIKA_ID', default='')
+
+# Контакты для шапки сайта. SITE_PHONE_RAW идёт в href="tel:" (без пробелов),
+# SITE_PHONE — то, что видит человек. Мессенджеры пустые по умолчанию: кнопка
+# не выводится, пока номер не задан, чтобы не вести людей в несуществующий чат.
+SITE_PHONE_RAW = config('SITE_PHONE_RAW', default='+79785792995')
+SITE_PHONE = config('SITE_PHONE', default='+7 978 579-29-95')
+SITE_WHATSAPP = config('SITE_WHATSAPP', default='')
+SITE_TELEGRAM = config('SITE_TELEGRAM', default='')
 
 # Верификация прав в панелях вебмастеров (мета-тег в <head>). Токен выдаётся
 # при добавлении сайта; пустое значение = мета-тег не выводится.
