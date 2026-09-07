@@ -89,9 +89,37 @@ m[i].l=1*new Date();
 for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}
 k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
 (window,document,'script','https://mc.yandex.ru/metrika/tag.js','ym');
-ym({{ YANDEX_METRIKA_ID }},'init',{clickmap:true,trackLinks:true,accurateTrackBounce:true,ecommerce:'dataLayer'});
+ym({{ YANDEX_METRIKA_ID }},'init',{clickmap:true,trackLinks:true,accurateTrackBounce:true,ecommerce:'dataLayer',webvisor:true,ssr:true});
 </script>
 <noscript><div><img src="https://mc.yandex.ru/watch/{{ YANDEX_METRIKA_ID }}" style="position:absolute;left:-9999px;" alt=""/></div></noscript>
+<script>
+  // Цели Метрики для htmx-форм. Заявки уходят без перезагрузки и без смены URL,
+  // поэтому цель типа «страница» их не увидит — только JavaScript-событие.
+  // Идентификаторы совпадают с целями, заведёнными в счётчике {{ YANDEX_METRIKA_ID }}.
+  (function () {
+    var GOALS = {
+      '/leads/quick-order/':  'quick_order',
+      '/leads/installation/': 'installation_request',
+      '/leads/selection/':    'selection_request',
+      '/leads/service/':      'service_request'
+    };
+    document.body.addEventListener('htmx:afterRequest', function (evt) {
+      var d = evt.detail || {};
+      if (!d.successful) return;                 // сетевые ошибки и 5xx не считаем
+      var xhr = d.xhr;
+      if (xhr && xhr.status >= 400) return;
+      var path = (d.pathInfo && (d.pathInfo.requestPath || d.pathInfo.path)) || '';
+      path = path.split('?')[0];
+      for (var url in GOALS) {
+        if (path.indexOf(url) !== -1) { ym({{ YANDEX_METRIKA_ID }}, 'reachGoal', GOALS[url]); return; }
+      }
+      // Финал квиза — это /leads/quiz-lead/<id>/, а не каждый шаг /leads/quiz-step/.
+      if (path.indexOf('/leads/quiz-lead/') !== -1) {
+        ym({{ YANDEX_METRIKA_ID }}, 'reachGoal', 'quiz_complete');
+      }
+    });
+  })();
+</script>
 {% endif %}
   {% include 'partials/header.html' %}
   <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-8">
