@@ -188,7 +188,7 @@ YANDEX_METRIKA_ID = config('YANDEX_METRIKA_ID', default='')
 # не выводится, пока номер не задан, чтобы не вести людей в несуществующий чат.
 SITE_PHONE_RAW = config('SITE_PHONE_RAW', default='+79785792995')
 SITE_PHONE = config('SITE_PHONE', default='+7 978 579-29-95')
-SITE_WHATSAPP = config('SITE_WHATSAPP', default='')
+SITE_MAX_URL = config('SITE_MAX_URL', default='')
 SITE_TELEGRAM = config('SITE_TELEGRAM', default='')
 
 # Верификация прав в панелях вебмастеров (мета-тег в <head>). Токен выдаётся

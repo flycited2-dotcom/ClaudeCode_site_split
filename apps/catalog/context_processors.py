@@ -44,7 +44,7 @@ def site_contacts(request):
     return {
         'SITE_PHONE_RAW': phone_raw,
         'SITE_PHONE': getattr(settings, 'SITE_PHONE', ''),
-        'SITE_WHATSAPP': getattr(settings, 'SITE_WHATSAPP', ''),
+        'SITE_MAX_URL': getattr(settings, 'SITE_MAX_URL', ''),
         'SITE_TELEGRAM': getattr(settings, 'SITE_TELEGRAM', ''),
     }
 
