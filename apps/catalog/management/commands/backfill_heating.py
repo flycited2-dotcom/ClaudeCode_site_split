@@ -33,7 +33,13 @@ class Command(BaseCommand):
                 for threshold in HEATING_THRESHOLDS:
                     if temp <= threshold:
                         by_threshold[threshold] += 1
-            if apply_changes and apply_heating_fields(product):
+            # declared=is_heat_pump — команда дозаполняет признак, но НЕ снимает
+            # уже выставленный. Rusklimat объявляет тепловой насос названием
+            # КАТЕГОРИИ (apps/sync/rusklimat_rest.py), а категорий поставщика
+            # здесь нет, поэтому вызов без declared обнулял такие товары: прогон
+            # 2026-09-12 выбил из подборки настенные теплонасосы AKEBONO NORDIC,
+            # у которых нет распознанного диапазона обогрева.
+            if apply_changes and apply_heating_fields(product, declared=product.is_heat_pump):
                 changed += 1
 
         self.stdout.write(f'Всего товаров: {total}')
