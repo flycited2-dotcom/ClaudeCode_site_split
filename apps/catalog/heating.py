@@ -4,13 +4,16 @@
 с низкотемпературным обогревом, а не отдельный тип оборудования. Поставщики его почти
 не проставляют (характеристика «Тепловой насос» приходит у 796 товаров Бриза, значение
 «да» — у 5), зато диапазон работы на обогрев отдают все трое — под разными названиями
-и в разных форматах.
+и в разных форматах. Поэтому is_heat_pump считается по этому диапазону, а характеристика
+поставщика лишь дополняет его (см. _qualifies_by_heating).
 
 Значения хранятся строками, поэтому разбирать их регуляркой на каждый запрос каталога —
 полный скан таблицы. Вместо этого результат пишется в Product.heating_min_temp при синке,
 как это сделано для Product.kind (см. classify.py).
 """
 import re
+
+from .models import Product
 
 # Названия характеристики у поставщиков (разведка прода 2026-08-28,
 # Профконд добавлен 2026-08-30).
@@ -81,6 +84,25 @@ def _declared_by_spec(product):
     return any(str(v).strip().lower() in ('да', 'yes', 'true') for v in values)
 
 
+def _qualifies_by_heating(product, temp):
+    """True, если товар — тепловой насос по диапазону обогрева.
+
+    Опираться только на характеристику поставщика нельзя: «да» приходит у 5
+    товаров из 14 тысяч, поэтому поле оставалось False почти у всего
+    ассортимента, а фильтр «Тепловой насос» отсекал 58 позиций подборки из 59
+    (проверено на проде 2026-09-12). Признак считается тем же порогом, по
+    которому отбирается подборка (HEAT_PUMP_THRESHOLD, см. collections.py),
+    и только для сплит-систем: тепловой насос воздух-воздух — это ярлык на
+    сплите, а не на конвекторе или котле, у которых тоже бывает отрицательная
+    рабочая температура.
+    """
+    return (
+        temp is not None
+        and temp <= HEAT_PUMP_THRESHOLD
+        and product.kind == Product.KIND_SPLIT_SYSTEM
+    )
+
+
 def apply_heating_fields(product, declared=False):
     """Проставляет heating_min_temp и is_heat_pump товару. True, если что-то изменилось.
 
@@ -89,7 +111,11 @@ def apply_heating_fields(product, declared=False):
     ProductTech: характеристики пишутся отдельным шагом после создания товара.
     """
     temp = min_heating_temp_for(product)
-    is_pump = bool(declared) or _declared_by_spec(product)
+    is_pump = (
+        bool(declared)
+        or _declared_by_spec(product)
+        or _qualifies_by_heating(product, temp)
+    )
 
     changed = (product.heating_min_temp != temp) or (product.is_heat_pump != is_pump)
     if changed:

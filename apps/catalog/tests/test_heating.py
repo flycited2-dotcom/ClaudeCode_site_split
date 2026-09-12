@@ -126,6 +126,34 @@ class ApplyHeatingFieldsTest(TestCase):
         p.refresh_from_db()
         self.assertTrue(p.is_heat_pump)
 
+    def test_heating_range_sets_pump_flag(self):
+        # Главный случай ассортимента: характеристику «Тепловой насос» поставщик
+        # не прислал, но сплит греет до -20 — это и есть теплонасос воздух-воздух.
+        p = self._product('NC-H1')
+        self._tech(p, 'Рабочие температурные границы наружного воздуха (нагрев)', '-20 ~ +24')
+        apply_heating_fields(p)
+        p.refresh_from_db()
+        self.assertTrue(p.is_heat_pump)
+
+    def test_heating_range_above_threshold_does_not_set_flag(self):
+        p = self._product('NC-H2')
+        self._tech(p, 'Мин. рабочая температура воздуха для внешнего блока', '-15')
+        apply_heating_fields(p)
+        p.refresh_from_db()
+        self.assertFalse(p.is_heat_pump)
+
+    def test_non_split_kind_does_not_set_flag(self):
+        # Порог по обогреву применяется только к сплит-системам: у аксессуаров
+        # и компонентов мульти-сплита ярлыка «тепловой насос» быть не должно.
+        p = self._product('NC-H3')
+        p.kind = Product.KIND_ACCESSORY
+        p.save(update_fields=['kind'])
+        self._tech(p, 'Диапазон рабочих температур, нагрев, °C', '-25~30')
+        apply_heating_fields(p)
+        p.refresh_from_db()
+        self.assertEqual(p.heating_min_temp, -25)
+        self.assertFalse(p.is_heat_pump)
+
     def test_returns_false_when_nothing_changed(self):
         p = self._product('NC-S1')
         self._tech(p, 'Мин. рабочая температура воздуха для внешнего блока', '-15')

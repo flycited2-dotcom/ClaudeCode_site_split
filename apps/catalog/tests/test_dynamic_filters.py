@@ -64,8 +64,10 @@ class DynamicFiltersDbTest(TestCase):
         # Регрессия: реальные is_filter=True TechSpec в проде почти все имеют
         # category=None (глобальные, не привязаны к категории поставщиком) —
         # такие тоже должны показываться, а не отфильтровываться по category.
+        # Название нейтральное: «Тепловой насос» для этой роли не годится —
+        # он в _EXCLUDED_TITLES (см. test_compute_tech_facets_excludes_heat_pump).
         cls.global_spec = TechSpec.objects.create(
-            title='Тепловой насос', category=None, is_filter=True, order=4,
+            title='Класс энергоэффективности', category=None, is_filter=True, order=4,
         )
 
     def setUp(self):
@@ -148,14 +150,14 @@ class DynamicFiltersDbTest(TestCase):
         ProductTech.objects.create(product=p1, spec=self.global_spec, value='Есть')
         result = compute_tech_facets(_qd(), self.category, Product.objects.all())
         titles = {g['title'] for g in result}
-        self.assertIn('Тепловой насос', titles)
+        self.assertIn('Класс энергоэффективности', titles)
 
     def test_compute_tech_facets_global_specs_shown_even_without_category(self):
         p1 = self._make('NC-1')
         ProductTech.objects.create(product=p1, spec=self.global_spec, value='Есть')
         result = compute_tech_facets(_qd(), None, Product.objects.all())
         titles = {g['title'] for g in result}
-        self.assertIn('Тепловой насос', titles)
+        self.assertIn('Класс энергоэффективности', titles)
 
     def test_compute_tech_facets_skips_high_cardinality_numeric_spec(self):
         # Регрессия с прода: «Эффективен для помещений площадью до» отдаёт
@@ -180,6 +182,20 @@ class DynamicFiltersDbTest(TestCase):
         result = compute_tech_facets(_qd(), self.category, Product.objects.all())
         titles = {g['title'] for g in result}
         self.assertNotIn('Бренд', titles)
+
+    def test_compute_tech_facets_excludes_heat_pump(self):
+        # Характеристика приходит только от Бриза и заполнена у 758 товаров из
+        # 14413, «да» — у 5. На подборке «Тепловые насосы» панель показывала
+        # «нет — 36, да — 1» и отсекала 58 её товаров из 59 (прод 2026-09-12).
+        # Тот же смысл отдают фасета «Работает на обогрев до» и is_heat_pump.
+        pump_spec = TechSpec.objects.create(
+            title='Тепловой насос', category=None, is_filter=True,
+        )
+        p1 = self._make('NC-1')
+        ProductTech.objects.create(product=p1, spec=pump_spec, value='нет')
+        result = compute_tech_facets(_qd(), self.category, Product.objects.all())
+        titles = {g['title'] for g in result}
+        self.assertNotIn('Тепловой насос', titles)
 
     def test_series_not_specially_excluded_but_capped_by_cardinality(self):
         # «Серия» не в _EXCLUDED_TITLES (в отличие от «Бренд») — если

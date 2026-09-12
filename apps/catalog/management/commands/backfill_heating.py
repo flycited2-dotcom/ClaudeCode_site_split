@@ -47,4 +47,6 @@ class Command(BaseCommand):
             ))
             return
 
+        pumps = Product.objects.filter(is_heat_pump=True).count()
+        self.stdout.write(f'С признаком «тепловой насос» после записи: {pumps}')
         self.stdout.write(self.style.SUCCESS(f'\nПрименено. Обновлено товаров: {changed}.'))
