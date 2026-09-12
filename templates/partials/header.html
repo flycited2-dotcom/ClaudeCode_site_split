@@ -8,13 +8,18 @@
       <span class="text-lg sm:text-xl font-bold tracking-tight text-ink">SplitHome</span>
     </a>
 
-    <!-- Desktop nav (md+) — contour buttons -->
-    <nav class="hidden md:flex items-center gap-2 lg:gap-2.5">
+    {% comment %}Брейкпоинты шапки заданы в splithub.css (.header-nav /
+    .header-burger / .nav-btn--wide), а не утилитами Tailwind: splithub.css
+    подключается ПОСЛЕ tailwind.css, поэтому `display: inline-flex` у .nav-btn
+    перебивает утилиту `hidden` — на «Монтаж» и «Доставку» её не навесить.
+    Держим все три правила в одном месте, чтобы логика шапки не была
+    размазана между двумя файлами.{% endcomment %}
+    <nav class="header-nav items-center gap-2 lg:gap-2.5">
       <a href="/catalog/"     class="nav-btn">Каталог</a>
       <a href="/catalog/heat-pumps/" class="nav-btn">Тепловые насосы</a>
       <a href="/quiz/"        class="nav-btn">Подбор</a>
-      <a href="/installation/" class="nav-btn">Монтаж</a>
-      <a href="/delivery/"    class="nav-btn">Доставка</a>
+      <a href="/installation/" class="nav-btn nav-btn--wide">Монтаж</a>
+      <a href="/delivery/"    class="nav-btn nav-btn--wide">Доставка</a>
       <a href="/contacts/"    class="nav-btn">Контакты</a>
     </nav>
 
@@ -77,9 +82,9 @@
         <a href="/auth/register/" class="btn btn-primary btn-sm hidden sm:inline-flex">Регистрация</a>
       {% endif %}
 
-      <!-- Burger (mobile only) -->
+      <!-- Burger (пока горизонтальное меню не помещается — см. .header-burger) -->
       <button type="button" onclick="toggleMobileMenu()" aria-label="Меню"
-              class="md:hidden w-10 h-10 rounded-full bg-white border border-black/5 flex items-center justify-center">
+              class="header-burger w-10 h-10 rounded-full bg-white border border-black/5 items-center justify-center">
         <svg id="burger-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5">
           <line x1="3" y1="6" x2="21" y2="6"/>
           <line x1="3" y1="12" x2="21" y2="12"/>
