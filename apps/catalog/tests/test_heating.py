@@ -154,6 +154,49 @@ class ApplyHeatingFieldsTest(TestCase):
         self.assertEqual(p.heating_min_temp, -25)
         self.assertFalse(p.is_heat_pump)
 
+    def _titled(self, nc, title):
+        p = self._product(nc)
+        p.title = title
+        p.save(update_fields=['title'])
+        return p
+
+    def test_title_sets_pump_flag_without_heating_range(self):
+        # Живой случай с прода: Rusklimat называет теплонасос прямо в названии,
+        # но ни характеристики «Тепловой насос», ни диапазона обогрева не даёт.
+        p = self._titled('NC-T1', 'Инверторный тепловой насос настенного типа серии AKEBONO NORDIC (R32)')
+        apply_heating_fields(p)
+        p.refresh_from_db()
+        self.assertIsNone(p.heating_min_temp)
+        self.assertTrue(p.is_heat_pump)
+
+    def test_pool_heat_pump_is_not_air_to_air(self):
+        # Бассейновый теплонасос греет воду — в подборку воздух-воздух не идёт.
+        p = self._titled('NC-T2', 'Тепловой насос для бассейна Royal Thermo MasterHeat Mini RTM-15MHN8')
+        apply_heating_fields(p)
+        p.refresh_from_db()
+        self.assertFalse(p.is_heat_pump)
+
+    def test_air_to_water_title_is_not_air_to_air(self):
+        p = self._titled('NC-T3', 'Тепловой насос воздух-вода Daichi DHP-8')
+        apply_heating_fields(p)
+        p.refresh_from_db()
+        self.assertFalse(p.is_heat_pump)
+
+    def test_title_rule_does_not_apply_to_non_split(self):
+        p = self._titled('NC-T4', 'Тепловой насос настенного типа, внешний блок')
+        p.kind = Product.KIND_MULTI_SPLIT_BLOCK
+        p.save(update_fields=['kind'])
+        apply_heating_fields(p)
+        p.refresh_from_db()
+        self.assertFalse(p.is_heat_pump)
+
+    def test_drainage_pump_title_does_not_set_flag(self):
+        # «Насос» в названии аксессуара не делает его тепловым насосом.
+        p = self._titled('NC-T5', 'Дренажный насос для кондиционера Aspen Mini Orange')
+        apply_heating_fields(p)
+        p.refresh_from_db()
+        self.assertFalse(p.is_heat_pump)
+
     def test_returns_false_when_nothing_changed(self):
         p = self._product('NC-S1')
         self._tech(p, 'Мин. рабочая температура воздуха для внешнего блока', '-15')
